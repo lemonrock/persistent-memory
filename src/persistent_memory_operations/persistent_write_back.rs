@@ -9,8 +9,8 @@
 /// Non-blocking.
 ///
 /// * Use this immediately after a *Relaxed* `store`.
-/// * Use this immediately after a *Release* `store`.
-/// * Use this immediately after an *Acquire* `load` (on Intel, this is a `mfence()` followed by a `ld()` or a locked read-modify-write instruction, which Linus argues is faster) (followed by a `persistent_fence()`).
+/// * Use this immediately after a *Release* `store` (precede with a `persistent_fence()`).
+/// * Use this immediately after an *Acquire* `load` (on Intel, this is a `mfence()` followed by a `ld()`) (followed by a `persistent_fence()`).
 /// * Use this immediately after all locked read-modify-write instructions, such as Compare-and-Swap, Fetch-Add, Exchange, etc (followed by a `persistent_fence()`\*) which have *Acquire-Release* (or presumably stronger) memory ordering; precede the locked read-modify-write instructions with a `persistent_fence()`\*.
 ///
 /// \* Pedro Ramalhete & Andreia Correia argue that the preceding and following `persistent_fence()` are not needed on x86_64 because locked read-modify-write instructions ensure order for `clflushopt()` and `clwb()`.
