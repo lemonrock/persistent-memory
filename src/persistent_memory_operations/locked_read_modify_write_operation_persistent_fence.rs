@@ -22,6 +22,6 @@ pub fn locked_read_modify_write_operation_persistent_fence()
 			persistent_fence();
 		}
 	}
-	
+
 	#[cfg(target_arch = "aarch64")] persistent_fence();
 }

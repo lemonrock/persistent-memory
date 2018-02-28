@@ -1,3 +1,6 @@
 [submodule ".cargo"]
 	path = .cargo
 	url = https://github.com/lemonrock/.cargo.git
+[submodule "lib/jemalloc"]
+	path = lib/jemalloc
+	url = https://github.com/jemalloc/jemalloc.git

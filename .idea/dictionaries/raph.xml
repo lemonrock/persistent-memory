@@ -3,14 +3,19 @@
     <words>
       <w>andreia</w>
       <w>appendv</w>
+      <w>autoconf</w>
+      <w>autogen</w>
       <w>bindgen</w>
+      <w>bitrig</w>
       <w>calloc</w>
+      <w>cflags</w>
       <w>chunksize</w>
       <w>clflush</w>
       <w>clflushopt</w>
       <w>clwb</w>
       <w>condvar</w>
       <w>correia</w>
+      <w>cppflags</w>
       <w>cpuid</w>
       <w>cvac</w>
       <w>dedup</w>
@@ -20,6 +25,7 @@
       <w>ecanceled</w>
       <w>edeadlk</w>
       <w>einval</w>
+      <w>emscripten</w>
       <w>enomem</w>
       <w>enospc</w>
       <w>enotrecoverable</w>
@@ -31,6 +37,7 @@
       <w>etimedout</w>
       <w>fffd</w>
       <w>funcs</w>
+      <w>gmake</w>
       <w>growable</w>
       <w>hyperthreaded</w>
       <w>immintrin</w>
@@ -41,11 +48,13 @@
       <w>isystem</w>
       <w>jemalloc</w>
       <w>kleen</w>
+      <w>libgcc</w>
       <w>libpmem</w>
       <w>libpmemblk</w>
       <w>libpmemcto</w>
       <w>libpmemlog</w>
       <w>libpmemobj</w>
+      <w>libpthread</w>
       <w>linearizability</w>
       <w>longjmp</w>
       <w>longlong</w>
@@ -67,11 +76,13 @@
       <w>musl</w>
       <w>nand</w>
       <w>nbyte</w>
+      <w>netbsd</w>
       <w>newv</w>
       <w>nonoverlapping</w>
       <w>nvml</w>
       <w>oldp</w>
       <w>oldval</w>
+      <w>openbsd</w>
       <w>pcommit</w>
       <w>pfence</w>
       <w>philippas</w>
@@ -90,12 +101,15 @@
       <w>pthread</w>
       <w>ramalhete</w>
       <w>recurses</w>
+      <w>redox</w>
       <w>repr</w>
       <w>rpmem</w>
+      <w>rumprun</w>
       <w>rwlock</w>
       <w>setjmp</w>
       <w>sfence</w>
       <w>skylake</w>
+      <w>sparc</w>
       <w>spinlock</w>
       <w>strdup</w>
       <w>structs</w>
@@ -104,6 +118,7 @@
       <w>tsigas</w>
       <w>unsafety</w>
       <w>wakeups</w>
+      <w>wasm</w>
       <w>wcsdup</w>
       <w>werror</w>
       <w>whitelist</w>

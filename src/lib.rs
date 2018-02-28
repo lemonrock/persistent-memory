@@ -51,6 +51,7 @@
 extern crate alloc;
 extern crate errno;
 #[cfg(target_os = "windows")] extern crate kernel32;
+extern crate jemalloc_sys;
 extern crate libc;
 pub extern crate parking_lot;
 #[macro_use] extern crate quick_error;
