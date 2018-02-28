@@ -13,6 +13,8 @@
 ///
 /// To ensure this intrinsic is available, use `cargo rustc -- -C target-feature=+clflushopt`.
 ///
+/// This intrinsic is not available for Intel architectures before Skylake and AMD architectures before Zen v1.
+///
 /// Executing `clflushopt` will nearly always a TSX abort.
 #[allow(unused_variables)]
 #[inline(always)]

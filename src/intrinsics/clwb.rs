@@ -15,7 +15,9 @@
 /// `clwb` is implicitly ordered with older stores executed by the logical processor to the same address.
 /// For usages that require only writing back modified data from cache lines to memory (do not require the line to be invalidated), and expect to subsequently access the data, software is recommended to use `clwb` (with appropriate fencing) instead of `clflushopt` or `clflush` for improved performance.
 ///
-/// To ensure this intrinsic is available, use `cargo rustc -- -C target-feature=+clwb`,
+/// To ensure this intrinsic is available, use `cargo rustc -- -C target-feature=+clwb`.
+///
+/// This intrinsic is not available for Intel architectures before Cannonlake or Icelake.
 ///
 /// Executing `clwb` will nearly always cause a TSX abort.
 //noinspection SpellCheckingInspection

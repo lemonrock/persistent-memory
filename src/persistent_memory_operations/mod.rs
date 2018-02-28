@@ -2,11 +2,9 @@
 // Copyright © 2017 The developers of persistent-memory. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/lemonrock/persistent-memory/master/COPYRIGHT.
 
 
-include!("CacheLineSize.rs");
-include!("clflush.rs");
-include!("clflushopt.rs");
-include!("clwb.rs");
-include!("dc_cvac.rs");
-include!("dmb_ish.rs");
-include!("round_address_down_to_start_of_cache_line.rs");
-include!("sfence.rs");
+use super::intrinsics::*;
+
+
+include!("persistent_fence.rs");
+include!("persistent_sync.rs");
+include!("persistent_write_back.rs");

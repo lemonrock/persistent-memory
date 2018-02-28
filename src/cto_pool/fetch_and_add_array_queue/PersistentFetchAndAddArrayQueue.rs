@@ -2,63 +2,10 @@
 // Copyright © 2017 The developers of nvml. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/lemonrock/nvml/master/COPYRIGHT.
 
 
-
-
-/*
-
-In preference order (also happens to be newest first order):-
-0. (nothing)
-1. `clwb` (CLWB is also ordered with respect to SFENCE, and thus a pfence()).
-2. `clflushopt`. (Skylake onwards)
-3. `clflush`.
-
-
-#define pmem_clflushopt(addr)\
-	asm volatile(".byte 0x66; clflush %0" : "+m" \
-		(*(volatile char *)(addr)));
-#define pmem_clwb(addr)\
-	asm volatile(".byte 0x66; xsaveopt %0" : "+m" \
-(*(volatile char *)(addr)));
-*/
-
-/// 1. Immediately after a `store`, write back the written value by issuing a pwb().
-/// 2.a. Immediately before a `store-release` issue a `pfence()`.
-/// 2.b. Immediately after a `store-release` write-back the written value by issuing a `pwb()`.
-/// 3. Immediately after a `load-acquire` write-back the loaded value by issuing a `pwb()` followed by a `pfence()`.
-/// 4a. Handle `CAS-acquire-release` as a combination of `store-release` and `load-acquire`:-
-/// 	- immediately before the CAS, issue a `pfence()`
-///  - immediately after the CAS,  write-back the loaded value by issuing a `pwb()` followed by a `pfence()`.
-/// 4b. As for 4a, but also for `fetch_add` and `exchange` and probably all other read-modify-write instructions.
-/// 5. Do nothing for `load`.
-/// 6. Before taking any I/O action, issue a `psync()` to ensure all changes have reached persistent storage.
-/// 7. Pedro Ramalhete & Andreia Correia argue that (4) does not require a `pfence()` before and a `pfence()` after on x86_64 because read-modify-write instructions (CAS, fetch_add, exchange, etc) ensure order for CLFLUSHOPT and CLWB.
-pub trait PersistentMemory
-{
-	/// Persistent-write-back: `pwb(addr) => CLWB(addr)`.
-	/// Initiates write-back of a specified location to persistent memory.
-	/// Non-blocking.
-	#[inline(always)]
-	fn persistent_write_back(address: *mut u8);
-	
-	/// Persistent-fence: `pfence() => SFENCE()`.
-	/// Enforces an ordering between previous and subsequent persistent-write-backs in the current thread.
-	#[inline(always)]
-	fn persistent_fence();
-	
-	/// Persistent-sync: `psync() => SFENCE()`
-	/// Blocking.
-	/// Finishes when all preceding `persistent_fence()` in this thread have completed.
-	#[inline(always)]
-	fn persistent_sync();
-}
-
-
-
-
 /// Rust implementation of a persistent variant of <https://github.com/pramalhe/ConcurrencyFreaks/blob/master/CPP/queues/array/FAAArrayQueue.hpp>.
 #[cfg_attr(target_pointer_width = "32", repr(C, align(64)))]
 #[cfg_attr(target_pointer_width = "64", repr(C, align(128)))]
-pub struct PersistentFetchAndAddArrayQueue<Value: CtoSafe, P: PersistentMemory>
+pub struct PersistentFetchAndAddArrayQueue<Value: CtoSafe>
 {
 	// head and tail should never be null.
 	head: DoubleCacheAligned<AtomicPtr<FreeListElement<Node<Value>>>>,
@@ -68,10 +15,9 @@ pub struct PersistentFetchAndAddArrayQueue<Value: CtoSafe, P: PersistentMemory>
 	free_list: CtoStrongArc<FreeList<Node<Value>>>,
 	reference_counter: AtomicUsize,
 	cto_pool_arc: CtoPoolArc,
-	phantom_data: PhantomData<P>,
 }
 
-impl<Value: CtoSafe, P: PersistentMemory> CtoSafe for PersistentFetchAndAddArrayQueue<Value, P>
+impl<Value: CtoSafe> CtoSafe for PersistentFetchAndAddArrayQueue<Value>
 {
 	#[inline(always)]
 	fn cto_pool_opened(&mut self, cto_pool_arc: &CtoPoolArc)
@@ -87,11 +33,11 @@ impl<Value: CtoSafe, P: PersistentMemory> CtoSafe for PersistentFetchAndAddArray
 		
 		// We do not need to the same as above from tail, as tail should be reachable from head via .next on Node instances.
 		
-		P::persistent_sync()
+		persistent_sync()
 	}
 }
 
-impl<Value: CtoSafe, P: PersistentMemory> Drop for PersistentFetchAndAddArrayQueue<Value, P>
+impl<Value: CtoSafe> Drop for PersistentFetchAndAddArrayQueue<Value>
 {
 	#[inline(always)]
 	fn drop(&mut self)
@@ -110,7 +56,7 @@ impl<Value: CtoSafe, P: PersistentMemory> Drop for PersistentFetchAndAddArrayQue
 	}
 }
 
-impl<Value: CtoSafe, P: PersistentMemory> CtoStrongArcInner for PersistentFetchAndAddArrayQueue<Value, P>
+impl<Value: CtoSafe> CtoStrongArcInner for PersistentFetchAndAddArrayQueue<Value>
 {
 	#[inline(always)]
 	fn reference_counter(&self) -> &AtomicUsize
@@ -119,7 +65,7 @@ impl<Value: CtoSafe, P: PersistentMemory> CtoStrongArcInner for PersistentFetchA
 	}
 }
 
-impl<Value: CtoSafe, P: PersistentMemory> PersistentFetchAndAddArrayQueue<Value, P>
+impl<Value: CtoSafe> PersistentFetchAndAddArrayQueue<Value>
 {
 	/// Creates a new instance.
 	#[inline(always)]
@@ -152,7 +98,7 @@ impl<Value: CtoSafe, P: PersistentMemory> PersistentFetchAndAddArrayQueue<Value,
 			this.mutable_reference().initialize(maximum_hyper_threads, free_list, cto_pool_arc, initial_free_list_element)
 		}
 		
-		P::persistent_sync();
+		persistent_sync();
 		
 		Ok(CtoStrongArc::new(this))
 	}

@@ -5,6 +5,7 @@
 use ExtendedNonNull;
 use ToNonNull;
 use hyper_thread::*;
+use persistent_memory_operations::*;
 use super::*;
 use super::arc::CtoStrongArc;
 use super::arc::CtoStrongArcInner;
@@ -16,7 +17,6 @@ use ::std::cmp::min;
 use ::std::fmt;
 use ::std::fmt::Debug;
 use ::std::fmt::Formatter;
-use ::std::marker::PhantomData;
 use ::std::mem::uninitialized;
 use ::std::mem::zeroed;
 use ::std::ops::Deref;

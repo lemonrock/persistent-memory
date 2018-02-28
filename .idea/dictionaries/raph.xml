@@ -1,14 +1,18 @@
 <component name="ProjectDictionaryState">
   <dictionary name="raph">
     <words>
+      <w>andreia</w>
       <w>appendv</w>
       <w>bindgen</w>
       <w>calloc</w>
       <w>chunksize</w>
+      <w>clflush</w>
       <w>clflushopt</w>
       <w>clwb</w>
       <w>condvar</w>
+      <w>correia</w>
       <w>cpuid</w>
+      <w>cvac</w>
       <w>dedup</w>
       <w>dereferenced</w>
       <w>eagain</w>
@@ -67,6 +71,8 @@
       <w>nvml</w>
       <w>oldp</w>
       <w>oldval</w>
+      <w>pcommit</w>
+      <w>pfence</w>
       <w>philippas</w>
       <w>pmdk</w>
       <w>pmem</w>
@@ -79,12 +85,15 @@
       <w>pobj</w>
       <w>poolsize</w>
       <w>prefault</w>
+      <w>psync</w>
       <w>pthread</w>
+      <w>ramalhete</w>
       <w>recurses</w>
       <w>repr</w>
       <w>rpmem</w>
       <w>rwlock</w>
       <w>setjmp</w>
+      <w>sfence</w>
       <w>skylake</w>
       <w>spinlock</w>
       <w>strdup</w>

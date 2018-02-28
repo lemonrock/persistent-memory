@@ -70,6 +70,21 @@ pub mod cto_pool;
 /// Hyper Thread support functions.
 pub mod hyper_thread;
 
+/// Persistent memory operations.
+///
+/// 1. Immediately after a `store`, write back the written value by issuing a pwb().
+/// 2.a. Immediately before a `store-release` issue a `pfence()`.
+/// 2.b. Immediately after a `store-release` write-back the written value by issuing a `pwb()`.
+/// 3. Immediately after a `load-acquire` write-back the loaded value by issuing a `pwb()` followed by a `pfence()`.
+/// 4a. Handle `CAS-acquire-release` as a combination of `store-release` and `load-acquire`:-
+/// 	- immediately before the CAS, issue a `pfence()`
+///  - immediately after the CAS,  write-back the loaded value by issuing a `pwb()` followed by a `pfence()`.
+/// 4b. As for 4a, but also for `fetch_add` and `exchange` and probably all other read-modify-write instructions.
+/// 5. Do nothing for `load`.
+/// 6. Before taking any I/O action, issue a `psync()` to ensure all changes have reached persistent storage.
+/// 7. Pedro Ramalhete & Andreia Correia argue that (4) does not require a `pfence()` before and a `pfence()` after on x86_64 because read-modify-write instructions (CAS, fetch_add, exchange, etc) ensure order for `clflushopt` and `clwb`.
+pub mod persistent_memory_operations;
+
 /// Essential Intrinsics.
 pub mod intrinsics;
 

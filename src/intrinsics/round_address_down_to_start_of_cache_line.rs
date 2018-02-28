@@ -2,11 +2,13 @@
 // Copyright © 2017 The developers of persistent-memory. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/lemonrock/persistent-memory/master/COPYRIGHT.
 
 
-include!("CacheLineSize.rs");
-include!("clflush.rs");
-include!("clflushopt.rs");
-include!("clwb.rs");
-include!("dc_cvac.rs");
-include!("dmb_ish.rs");
-include!("round_address_down_to_start_of_cache_line.rs");
-include!("sfence.rs");
+/// Aligns an address to the start of a cache line by rounding it down.
+#[inline(always)]
+pub fn round_address_down_to_start_of_cache_line(address: *mut u8) -> *mut u8
+{
+	debug_assert_ne!(CacheLineSize, 0, "CacheLineSize can not be zero");
+	
+	const CacheLineFlags: usize = !(CacheLineSize - 1);
+	
+	((address as usize) & CacheLineFlags) as *mut u8
+}
