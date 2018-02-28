@@ -71,9 +71,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_swap_release(&self, value: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let value = self.swap_(value, Release);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		value
 	}
 	
@@ -81,9 +81,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_swap_acquire(&self, value: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let value = self.swap_(value, Acquire);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		value
 	}
 	
@@ -91,9 +91,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_swap_acquire_release(&self, value: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let value = self.swap_(value, AcqRel);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		value
 	}
 	
@@ -101,9 +101,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_swap_sequentially_consistent(&self, value: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let value = self.swap_(value, SeqCst);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		value
 	}
 	
@@ -120,11 +120,11 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_compare_and_swap_strong_acquire_relaxed(&self, current: Value, new: Value)-> Result<Value, Value>
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.compare_exchange_(current, new, Acquire, Relaxed);
 		if result.is_ok()
 		{
-			persistent_fence();
+			locked_read_modify_write_operation_persistent_fence();
 		}
 		result
 	}
@@ -134,9 +134,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_compare_and_swap_strong_acquire_acquire(&self, current: Value, new: Value)-> Result<Value, Value>
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.compare_exchange_(current, new, Acquire, Acquire);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -145,9 +145,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_compare_and_swap_strong_acquire_release(&self, current: Value, new: Value)-> Result<Value, Value>
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.compare_exchange_(current, new, AcqRel, Acquire);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -156,9 +156,9 @@ pub trait AtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_compare_and_swap_strong_sequentially_consistent(&self, current: Value, new: Value)-> Result<Value, Value>
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.compare_exchange_(current, new, SeqCst, SeqCst);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	

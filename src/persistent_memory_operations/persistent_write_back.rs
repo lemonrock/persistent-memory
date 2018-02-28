@@ -38,8 +38,5 @@ pub fn persistent_write_back(address: *mut u8)
 		}
 	}
 	
-	#[cfg(target_arch = "aarch64")]
-	{
-		dc_cvac(address_rounded_down_to_start_of_cache_line)
-	}
+	#[cfg(target_arch = "aarch64")] dc_cvac(address_rounded_down_to_start_of_cache_line);
 }

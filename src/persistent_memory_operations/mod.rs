@@ -24,7 +24,10 @@ use ::std::sync::atomic::Ordering::SeqCst;
 
 
 include!("AtomicPersistentMemory.rs");
+include!("BoolAtomicPersistentMemory.rs");
+include!("BitAtomicPersistentMemory.rs");
 include!("IntegerAtomicPersistentMemory.rs");
+include!("locked_read_modify_write_operation_persistent_fence.rs");
 include!("persistent_fence.rs");
 include!("persistent_sync.rs");
 include!("persistent_write_back.rs");

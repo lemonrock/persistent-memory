@@ -65,6 +65,7 @@
       <w>mrwlock</w>
       <w>msync</w>
       <w>musl</w>
+      <w>nand</w>
       <w>nbyte</w>
       <w>newv</w>
       <w>nonoverlapping</w>

@@ -16,9 +16,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_add_release(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_add_(increment, Release);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -26,9 +26,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_add_acquire(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_add_(increment, Acquire);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -36,9 +36,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_add_acquire_release(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_add_(increment, AcqRel);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -46,9 +46,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_add_sequentially_consistent(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_add_(increment, SeqCst);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -63,9 +63,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_sub_release(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_sub_(increment, Release);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -73,9 +73,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_sub_acquire(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_sub_(increment, Acquire);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -83,9 +83,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_sub_acquire_release(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_sub_(increment, AcqRel);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
@@ -93,9 +93,9 @@ pub trait IntegerAtomicPersistentMemory<Value: Copy>
 	#[inline(always)]
 	fn persistent_fetch_sub_sequentially_consistent(&self, increment: Value) -> Value
 	{
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		let result = self.fetch_sub_(increment, SeqCst);
-		persistent_fence();
+		locked_read_modify_write_operation_persistent_fence();
 		result
 	}
 	
