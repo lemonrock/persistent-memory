@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="check" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+  <configuration default="false" name="compile" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
     <option name="channel" value="NIGHTLY" />
-    <option name="command" value="check" />
+    <option name="command" value="rustc -- -C target-feature=+rdrnd,+sse2,+clflushopt,+clwb" />
     <option name="nocapture" value="true" />
     <option name="backtrace" value="SHORT" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />

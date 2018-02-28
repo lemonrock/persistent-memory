@@ -5,6 +5,8 @@
       <w>bindgen</w>
       <w>calloc</w>
       <w>chunksize</w>
+      <w>clflushopt</w>
+      <w>clwb</w>
       <w>condvar</w>
       <w>cpuid</w>
       <w>dedup</w>
