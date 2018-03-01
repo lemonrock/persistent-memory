@@ -7,6 +7,12 @@
 /// DAX device paths should look like `/dev/daxN.M`.
 ///
 /// Linux calls the subsystem associated with implemented DAX `device-dax`.
+/// It is also known as the "device-dax character device interface".
+///
+/// DAX devices require an overhead of 16GB per 1TB on x86_64 (64 bytes per 4K page).
+/// In other words, 1/16th is 'lost' to storage.
+///
+///
 pub trait DaxDevicePathExt
 {
 	/// Is this file path a DAX device file?
@@ -17,22 +23,22 @@ pub trait DaxDevicePathExt
 	/// DAX device size.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_size(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>;
+	fn find_dax_device_size(&self) -> Result<usize, CouldNotObtainDaxDeviceStatisticError>;
 	
 	/// DAX device alignment.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_alignment(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>;
+	fn find_dax_device_alignment(&self) -> Result<usize, CouldNotObtainDaxDeviceStatisticError>;
 	
 	/// DAX device region id.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_region_id(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>;
+	fn find_dax_device_region_id(&self) -> Result<usize, CouldNotObtainDaxDeviceStatisticError>;
 	
 	#[doc(hidden)]
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_file_statistic_string<Statistic, FileTemplate: FnOnce(u32, u32) -> String, Parser: FnOnce(&str) -> Result<Statistic, CouldNotObtainDeviceDaxStatisticError>>(&self, file_template: FileTemplate, parser: Parser) -> Result<Statistic, CouldNotObtainDeviceDaxStatisticError>;
+	fn find_dax_device_file_statistic_string<Statistic, FileTemplate: FnOnce(u32, u32) -> String, Parser: FnOnce(&str) -> Result<Statistic, CouldNotObtainDaxDeviceStatisticError>>(&self, file_template: FileTemplate, parser: Parser) -> Result<Statistic, CouldNotObtainDaxDeviceStatisticError>;
 	
 	#[doc(hidden)]
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
@@ -62,7 +68,7 @@ impl DaxDevicePathExt for Path
 	
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_size(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>
+	fn find_dax_device_size(&self) -> Result<usize, CouldNotObtainDaxDeviceStatisticError>
 	{
 		self.find_dax_device_file_statistic_string
 		(
@@ -87,7 +93,7 @@ impl DaxDevicePathExt for Path
 	
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_alignment(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>
+	fn find_dax_device_alignment(&self) -> Result<usize, CouldNotObtainDaxDeviceStatisticError>
 	{
 		self.find_dax_device_file_statistic_string
 		(
@@ -110,7 +116,7 @@ impl DaxDevicePathExt for Path
 	
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_region_id(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>
+	fn find_dax_device_region_id(&self) -> Result<usize, CouldNotObtainDaxDeviceStatisticError>
 	{
 		self.find_dax_device_file_statistic_string
 		(
@@ -121,7 +127,7 @@ impl DaxDevicePathExt for Path
 	
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn find_dax_device_file_statistic_string<Statistic, FileTemplate: FnOnce(u32, u32) -> String, Parser: FnOnce(&str) -> Result<Statistic, CouldNotObtainDeviceDaxStatisticError>>(&self, file_template: FileTemplate, parser: Parser) -> Result<Statistic, CouldNotObtainDeviceDaxStatisticError>
+	fn find_dax_device_file_statistic_string<Statistic, FileTemplate: FnOnce(u32, u32) -> String, Parser: FnOnce(&str) -> Result<Statistic, CouldNotObtainDaxDeviceStatisticError>>(&self, file_template: FileTemplate, parser: Parser) -> Result<Statistic, CouldNotObtainDaxDeviceStatisticError>
 	{
 		let device_dax_align_file_path =
 		{
@@ -136,7 +142,7 @@ impl DaxDevicePathExt for Path
 		
 		if !statistic_string.ends_with('\n')
 		{
-			return Err(CouldNotObtainDeviceDaxStatisticError::StringDidNotEndWithLineFeed)
+			return Err(CouldNotObtainDaxDeviceStatisticError::StringDidNotEndWithLineFeed)
 		}
 		let statistic_string = &statistic_string[.. statistic_string.len() - 1];
 		

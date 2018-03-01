@@ -10,5 +10,5 @@
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::path::PathBuf;
 
 
-include!("CouldNotObtainDeviceDaxStatisticError.rs");
+include!("CouldNotObtainDaxDeviceStatisticError.rs");
 include!("DaxDevicePathExt.rs");

@@ -6,7 +6,7 @@ quick_error!
 {
 	/// Reason for failing to obtain Device DAX statistic.
 	#[derive(Debug)]
-	pub enum CouldNotObtainDeviceDaxStatisticError
+	pub enum CouldNotObtainDaxDeviceStatisticError
 	{
 		/// Input-Output error.
 		InputOutput(cause: ::std::io::Error)
