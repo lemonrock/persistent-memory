@@ -2,13 +2,15 @@
 // Copyright © 2017 The developers of persistent-memory. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/lemonrock/persistent-memory/master/COPYRIGHT.
 
 
-#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::io::Read;
-#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::fs::File;
-#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::os::unix::fs::MetadataExt;
-#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::path::Path;
-
-
-include!("CouldNotObtainDeviceDaxStatisticError.rs");
-include!("device_dax_alignment.rs");
-include!("device_dax_file_statistic_string.rs");
-include!("find_device_dax_region_id.rs");
+/// Device DAX region id.
+#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+#[inline(always)]
+pub fn find_device_dax_region_id(device_dax_path: &Path) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>
+{
+	device_dax_file_statistic_string
+	(
+		device_dax_path,
+		|device_major, device_minor| format!("/sys/dev/char/{}:{}/device/dax_region/id", device_major, device_minor),
+		|statistic_string| Ok(statistic_string.parse::<usize>()?)
+	)
+}
