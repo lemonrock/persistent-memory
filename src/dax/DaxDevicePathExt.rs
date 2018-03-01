@@ -3,19 +3,28 @@
 
 
 /// An extension trait to provides methods to file paths believed to be DAX devices.
+///
+/// DAX device paths should look like `/dev/daxN.M`.
+///
+/// Linux calls the subsystem associated with implemented DAX `device-dax`.
 pub trait DaxDevicePathExt
 {
-	/// Is this file path a device DAX file?
+	/// Is this file path a DAX device file?
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
 	fn is_this_a_dax_device(&self) -> bool;
 	
-	/// Device DAX alignment.
+	/// DAX device size.
+	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+	#[inline(always)]
+	fn find_dax_device_size(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>;
+	
+	/// DAX device alignment.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
 	fn find_dax_device_alignment(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>;
 	
-	/// Device DAX region id.
+	/// DAX device region id.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
 	fn find_dax_device_region_id(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>;
@@ -33,7 +42,6 @@ pub trait DaxDevicePathExt
 
 impl DaxDevicePathExt for Path
 {
-	/// Is this file path a device DAX file?
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
 	fn is_this_a_dax_device(&self) -> bool
@@ -42,14 +50,39 @@ impl DaxDevicePathExt for Path
 		{
 			Err(_) => false,
 			Ok((device_major, device_minor)) =>
+			{
+				match PathBuf::from(format!("/sys/dev/char/{}:{}/subsystem", device_major, device_minor)).canonicalize()
 				{
-					match PathBuf::from(format!("/sys/dev/char/{}:{}/subsystem", device_major, device_minor)).canonicalize()
-					{
-						Err(_) => false,
-						Ok(real_path) => real_path.starts_with("/sys/class/dax")
-					}
+					Err(_) => false,
+					Ok(real_path) => real_path.starts_with("/sys/class/dax")
 				}
+			}
 		}
+	}
+	
+	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+	#[inline(always)]
+	fn find_dax_device_size(&self) -> Result<usize, CouldNotObtainDeviceDaxStatisticError>
+	{
+		self.find_dax_device_file_statistic_string
+		(
+			|device_major, device_minor| format!("/sys/dev/char/{}:{}/size", device_major, device_minor),
+			|statistic_string|
+			{
+				if statistic_string.starts_with("0x")
+				{
+					Ok(usize::from_str_radix(&statistic_string[2 ..], 16)?)
+				}
+				else if statistic_string.starts_with("0")
+				{
+					Ok(usize::from_str_radix(&statistic_string[1 ..], 8)?)
+				}
+				else
+				{
+					Ok(usize::from_str_radix(statistic_string, 10)?)
+				}
+			}
+		)
 	}
 	
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
