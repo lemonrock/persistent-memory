@@ -13,8 +13,13 @@
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub fn current_hyper_thread_index() -> usize
 {
-	use ::libc::sched_getcpu;
-
+	// use ::libc::sched_getcpu only exists on GNU, not musl, targets.
+	use ::libc::c_int;
+	extern "C"
+	{
+		fn sched_getcpu() -> c_int;
+	}
+	
 	let result = unsafe { sched_getcpu() };
 	debug_assert!(result >= 0, "sched_getcpu() was negative");
 	result as usize
