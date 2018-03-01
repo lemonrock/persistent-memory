@@ -5,7 +5,7 @@
 [package]
 name = "persistent-memory"
 description = "Provides intrinsics for Rust to use persistent memory (pmem / NVML) without C bindings."
-keywords = ["persistent", "concurrency", "memory"]
+keywords = ["persistent", "concurrency", "memory", "DAX", "NVDIMM"]
 categories = ["hardware-support", "concurrency", "memory", "data-structures"]
 license = "MIT"
 authors = ["Raphael Cohn <raphael.cohn@stormmq.com>"]
