@@ -9,6 +9,7 @@ struct MemoryPointerRange<T>
 	upper_exclusive: *mut T,
 }
 
+// Part of a design to find a block allocator from a pointer. Fails because we need a way to wrap up Block::BlockSizeInBytes
 impl<T> MemoryPointerRange<T>
 {
 	#[inline(always)]

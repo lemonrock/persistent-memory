@@ -68,6 +68,9 @@ use ::std::ptr::NonNull;
 /// CTO Pool
 pub mod cto_pool;
 
+/// DAX (Device Direct Access)
+pub mod dax;
+
 /// Hyper Thread support functions.
 pub mod hyper_thread;
 
