@@ -13,6 +13,7 @@ documentation = "https://github.com/lemonrock/persistent-memory/blob/master/READ
 homepage = "https://github.com/lemonrock/persistent-memory"
 repository = "https://github.com/lemonrock/persistent-memory.git"
 include = ["README.md", "LICENSE", "COPYRIGHT", "src/**/*.rs", "lib/**/*", "Cargo.toml", "rustfmt.toml", "clippy.toml"]
+links = "jemalloc"
 build = "src/build.rs"
 readme = "README.md"
 publish = true
@@ -23,7 +24,6 @@ cc = "1.0"
 
 [dependencies]
 errno = "0.2"
-jemalloc-sys = "0.1.4"
 libc = "0.2"
 parking_lot = "0.5.3"
 quick-error = "1.2.0"

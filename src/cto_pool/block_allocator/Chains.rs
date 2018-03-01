@@ -5,7 +5,7 @@
 /// Stored in Persistent Memory
 pub struct Chains<B: Block>
 {
-	block_allocator: CtoArc<BlockAllocator<B>>,
+	block_allocator: CtoStrongArc<BlockAllocator<B>>,
 	head_of_chains_linked_list: BlockPointer<B>,
 }
 
@@ -37,7 +37,7 @@ impl<B: Block> CtoSafe for Chains<B>
 impl<B: Block> Chains<B>
 {
 	#[inline(always)]
-	fn new(block_allocator: &CtoArc<BlockAllocator<B>>) -> Result<NonNull<Self>, ()>
+	fn new(block_allocator: &CtoStrongArc<BlockAllocator<B>>) -> Result<NonNull<Self>, ()>
 	{
 		match block_allocator.cto_pool_arc.pool_pointer().aligned_alloc(size_of::<Self>(), size_of::<Self>())
 		{

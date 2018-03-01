@@ -31,9 +31,14 @@ const UnsupportedTargets: [&'static str; 8] =
 	"wasm32",
 ];
 
-const JemallocFunctionPrefix: &'static str = "_persistent_memory_";
+const JemallocNamespacePrefix: &'static str = "_persistent_memory_";
 
 fn main()
+{
+	compile_specialized_jemalloc()
+}
+
+fn compile_specialized_jemalloc()
 {
 	if use_external_library_rather_than_compiling()
 	{
@@ -44,7 +49,7 @@ fn main()
 	
 	create_build_folder_structure(&build_folder_path);
 	
-	autogen_sh(&build_folder_path, &jemalloc_source_folder_path);
+	autogen_sh(&jemalloc_source_folder_path);
 	
 	configure(&host, &target, &out_folder_path, &build_folder_path, &jemalloc_source_folder_path);
 	
@@ -109,7 +114,7 @@ fn create_build_folder_structure(build_folder_path: &Path)
 	create_dir_all(build_folder_path).expect("Could not create build directory folder structure");
 }
 
-fn autogen_sh(build_folder_path: &Path, jemalloc_source_folder_path: &Path)
+fn autogen_sh(jemalloc_source_folder_path: &Path)
 {
 	let mut autoconf_sh_command = Command::new("sh");
 	autoconf_sh_command.arg(shell_program("autogen.sh", jemalloc_source_folder_path)).current_dir(jemalloc_source_folder_path);
@@ -136,13 +141,24 @@ fn configure(target: &str, host: &str, out_folder_path: &Path, build_folder_path
 	
 	configure_command.arg(format!("--prefix={}", out_folder_path.display()));
 	
-	configure_command.arg(format!("--with-jemalloc-prefix={}", JemallocFunctionPrefix));
+	configure_command.arg("--without-export");
+	
+	// Causes compilation of jemalloc to fail due to an implicit function definition.
+	// configure_command.arg(format!("--with-jemalloc-prefix={}", JemallocNamespacePrefix));
+	
+	configure_command.arg(format!("--with-private-namespace={}", JemallocNamespacePrefix));
 	
 	configure_command.arg("--disable-cxx");
+	
+	configure_command.arg("--disable-xmalloc");
 	
 	if environment_variable_exists("CARGO_FEATURE_DEBUG")
 	{
 		configure_command.arg("--enable-debug");
+	}
+	else
+	{
+		configure_command.arg("--disable-stats");
 	}
 	
 	if environment_variable_exists("CARGO_FEATURE_PROFILING")
@@ -187,17 +203,20 @@ fn make(host: &str, build_folder_path: &Path)
 
 fn print_variables_to_cargo(target: &str, out_folder_path: &Path, build_folder_path: &Path)
 {
+	println!("cargo:rerun-if-changed=build.rs");
+	println!("cargo:rerun-if-env-changed=JEMALLOC_OVERRIDE");
+	
 	println!("cargo:root={}", out_folder_path.display());
 	
 	println!("cargo:rustc-link-search=native={}/lib", build_folder_path.display());
 	
 	if target.contains("windows")
 	{
-		println!("cargo:rustc-link-lib=static=jemalloc");
+		println!("cargo:rustc-link-lib=static-nobundle=jemalloc");
 	}
 	else
 	{
-		println!("cargo:rustc-link-lib=static=jemalloc_pic");
+		println!("cargo:rustc-link-lib=static-nobundle=jemalloc_pic");
 	}
 	
 	// Specifically on android we need to also link to `libgcc`, as it uses intrinsics implemented in `libgcc`.
@@ -226,15 +245,21 @@ fn is_target_unsupported(target: String) -> String
 
 fn execute(command: &mut Command)
 {
-	let status = match command.status()
-	{
-		Ok(status) => status,
-		Err(error) => panic!("Failed to execute command: '{}'", error),
-	};
+	let output = command.output();
 	
-	if !status.success()
+	match output
 	{
-		panic!("Command failed with '{:?}'; expected success, got exit status '{}'.", command, status);
+		Err(error) => panic!("Failed to execute command: '{}'", error),
+		Ok(output) =>
+		{
+			let exit_status = output.status;
+			if !exit_status.success()
+			{
+				eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+				eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+				panic!("Command '{:?}' failed; expected success, got exit_status '{}'.", command, exit_status);
+			}
+		}
 	}
 }
 
@@ -285,7 +310,11 @@ fn shell_program(shell_program_name: &str, jemalloc_source_folder_path: &Path) -
 
 fn compiler_path_and_c_flags() -> (PathBuf, String)
 {
-	let compiler = Build::new().get_compiler();
+	let build = Build::new();
+	
+	// This commands dumps environment variables to standard out for some reason.
+	let compiler = build.get_compiler();
+	
 	let compiler_path = compiler.path().to_owned();
 	let c_flags = compiler.args().iter().map(|c_flag| c_flag.to_str().expect("C Flag contained non-UTF-8 character")).collect::<Vec<_>>().join(" ");
 	(compiler_path, c_flags)

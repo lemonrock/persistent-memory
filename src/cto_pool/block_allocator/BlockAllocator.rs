@@ -88,6 +88,56 @@ impl<B: Block> BlockAllocator<B>
 		CtoStrongArc::new(this)
 	}
 	
+	/// Allocate
+	pub fn allocate(block_allocator: &CtoStrongArc<Self>, requested_size: usize) -> Result<NonNull<Chains<B>>, ()>
+	{
+		let mut chains = Chains::new(block_allocator)?;
+		
+		let (number_of_blocks_required, _capacity_in_use_of_last_chain) = B::number_of_blocks_required_and_capacity_in_use_of_last_chain(requested_size);
+		if number_of_blocks_required == 0
+		{
+			return Ok(chains)
+		}
+		
+		// TODO: Estimate if there is enough memory left before allocating, as it makes failure faster.
+		
+		let mut number_of_blocks_remaining_to_find = number_of_blocks_required;
+		
+		let (head_of_chains_linked_list, chain_length) = block_allocator.grab_a_chain(number_of_blocks_remaining_to_find);
+		if head_of_chains_linked_list.is_null()
+		{
+			unsafe { drop_in_place(chains.as_ptr()) };
+			return Err(())
+		}
+		unsafe { chains.as_mut().head_of_chains_linked_list = head_of_chains_linked_list };
+		
+		let mut previous_chain = head_of_chains_linked_list;
+		number_of_blocks_remaining_to_find -= chain_length;
+		while number_of_blocks_remaining_to_find != 0
+		{
+			let (next_chain, chain_length) = block_allocator.grab_a_chain(number_of_blocks_remaining_to_find);
+			let previous_chain_block_meta_data = block_allocator.block_meta_data_unchecked(previous_chain);
+			if next_chain.is_null()
+			{
+				// If this isn't done, then who knows what we might free in `drop()`.
+				previous_chain_block_meta_data.set_next_chain(BlockPointer::Null);
+				unsafe { drop_in_place(chains.as_ptr()) };
+				
+				return Err(())
+			}
+			previous_chain_block_meta_data.set_next_chain(next_chain);
+			
+			previous_chain = next_chain;
+			number_of_blocks_remaining_to_find -= chain_length;
+		}
+		
+		block_allocator.block_meta_data_unchecked(previous_chain).set_next_chain(BlockPointer::Null);
+		
+		B::P::flush_non_null(chains);
+		
+		Ok(chains)
+	}
+	
 	#[inline(always)]
 	fn block_meta_data_unchecked(&self, block_pointer: BlockPointer<B>) -> &BlockMetaData<B>
 	{
@@ -169,56 +219,6 @@ impl<B: Block> BlockAllocator<B>
 		}
 		
 		self.nothing_to_merge_with_so_add_to_free_list(solitary_chain_block_pointer, solitary_chain_block_meta_data, solitary_chain_length);
-	}
-	
-	/// Allocate
-	pub fn allocate(block_allocator: &CtoArc<Self>, requested_size: usize) -> Result<NonNull<Chains<B>>, ()>
-	{
-		let mut chains = Chains::new(block_allocator)?;
-		
-		let (number_of_blocks_required, _capacity_in_use_of_last_chain) = B::number_of_blocks_required_and_capacity_in_use_of_last_chain(requested_size);
-		if number_of_blocks_required == 0
-		{
-			return Ok(chains)
-		}
-		
-		// TODO: Estimate if there is enough memory left before allocating, as it makes failure faster.
-		
-		let mut number_of_blocks_remaining_to_find = number_of_blocks_required;
-		
-		let (head_of_chains_linked_list, chain_length) = block_allocator.grab_a_chain(number_of_blocks_remaining_to_find);
-		if head_of_chains_linked_list.is_null()
-		{
-			unsafe { drop_in_place(chains.as_ptr()) };
-			return Err(())
-		}
-		unsafe { chains.as_mut().head_of_chains_linked_list = head_of_chains_linked_list };
-		
-		let mut previous_chain = head_of_chains_linked_list;
-		number_of_blocks_remaining_to_find -= chain_length;
-		while number_of_blocks_remaining_to_find != 0
-		{
-			let (next_chain, chain_length) = block_allocator.grab_a_chain(number_of_blocks_remaining_to_find);
-			let previous_chain_block_meta_data = block_allocator.block_meta_data_unchecked(previous_chain);
-			if next_chain.is_null()
-			{
-				// If this isn't done, then who knows what we might free in `drop()`.
-				previous_chain_block_meta_data.set_next_chain(BlockPointer::Null);
-				unsafe { drop_in_place(chains.as_ptr()) };
-				
-				return Err(())
-			}
-			previous_chain_block_meta_data.set_next_chain(next_chain);
-			
-			previous_chain = next_chain;
-			number_of_blocks_remaining_to_find -= chain_length;
-		}
-		
-		block_allocator.block_meta_data_unchecked(previous_chain).set_next_chain(BlockPointer::Null);
-		
-		B::P::flush_non_null(chains);
-		
-		Ok(chains)
 	}
 	
 	#[inline(always)]

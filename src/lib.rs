@@ -28,6 +28,7 @@
 #![feature(pointer_methods)]
 #![feature(shared)]
 #![feature(specialization)]
+#![feature(static_nobundle)]
 #![feature(stmt_expr_attributes)]
 #![feature(str_internals)]
 #![feature(target_feature)]
@@ -51,7 +52,6 @@
 extern crate alloc;
 extern crate errno;
 #[cfg(target_os = "windows")] extern crate kernel32;
-extern crate jemalloc_sys;
 extern crate libc;
 pub extern crate parking_lot;
 #[macro_use] extern crate quick_error;
@@ -71,6 +71,12 @@ pub mod cto_pool;
 /// Hyper Thread support functions.
 pub mod hyper_thread;
 
+/// Essential Intrinsics.
+pub mod intrinsics;
+
+/// Specialized jemalloc support.
+pub mod jemalloc;
+
 /// Persistent memory operations.
 ///
 /// 1. Immediately after a `store`, write back the written value by issuing a pwb().
@@ -85,9 +91,6 @@ pub mod hyper_thread;
 /// 6. Before taking any I/O action, issue a `psync()` to ensure all changes have reached persistent storage.
 /// 7. Pedro Ramalhete & Andreia Correia argue that (4) does not require a `pfence()` before and a `pfence()` after on x86_64 because read-modify-write instructions (CAS, fetch_add, exchange, etc) ensure order for `clflushopt` and `clwb`.
 pub mod persistent_memory_operations;
-
-/// Essential Intrinsics.
-pub mod intrinsics;
 
 
 include!("ExtendedNonNull.rs");
