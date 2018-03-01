@@ -68,9 +68,6 @@ use ::std::ptr::NonNull;
 /// CTO Pool
 pub mod cto_pool;
 
-/// DAX (Device Direct Access)
-pub mod dax;
-
 /// Hyper Thread support functions.
 pub mod hyper_thread;
 
@@ -94,6 +91,9 @@ pub mod jemalloc;
 /// 6. Before taking any I/O action, issue a `psync()` to ensure all changes have reached persistent storage.
 /// 7. Pedro Ramalhete & Andreia Correia argue that (4) does not require a `pfence()` before and a `pfence()` after on x86_64 because read-modify-write instructions (CAS, fetch_add, exchange, etc) ensure order for `clflushopt` and `clwb`.
 pub mod persistent_memory_operations;
+
+/// Path support for DAX (Direct Access) devices and mmap-able files.
+pub mod path;
 
 
 include!("ExtendedNonNull.rs");

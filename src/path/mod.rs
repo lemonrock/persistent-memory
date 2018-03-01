@@ -12,3 +12,4 @@
 
 include!("CouldNotObtainDaxDeviceStatisticError.rs");
 include!("DaxDevicePathExt.rs");
+include!("PersistentMemoryFilePathExt.rs");

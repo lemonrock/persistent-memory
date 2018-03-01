@@ -4,7 +4,7 @@
 
 quick_error!
 {
-	/// Reason for failing to obtain Device DAX statistic.
+	/// Reason for failing to obtain a DAX device statistic.
 	#[derive(Debug)]
 	pub enum CouldNotObtainDaxDeviceStatisticError
 	{
@@ -17,20 +17,27 @@ quick_error!
             from()
 		}
 		
-		/// Alignment string did not end with line-feed
+		/// Alignment string did not end with line-feed.
 		StringDidNotEndWithLineFeed
 		{
 			description("string did not end with line-feed")
 			display("Device DAX statistic string did not end with line-feed")
 		}
 		
-		/// Alignment string could not be parsed
+		/// Alignment string could not be parsed.
 		StringCouldNotBeParsed(cause: ::std::num::ParseIntError)
 		{
 			cause(cause)
 			description(cause.description())
             display("Could not parse device DAX statistic because of string formatting error: {}", cause)
             from()
+		}
+		
+		/// Isn't a file.
+		IsNotAFile
+		{
+			description("Is not a file")
+            display("Is not a file")
 		}
 	}
 }
