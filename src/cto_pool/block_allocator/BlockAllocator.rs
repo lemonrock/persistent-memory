@@ -8,6 +8,7 @@
 pub struct BlockAllocator<B: Block>
 {
 	reference_counter: AtomicUsize,
+	block_size: BlockSize,
 	memory_base_pointer: NonNull<u8>,
 	exclusive_end_address: NonNull<u8>,
 	cto_pool_arc: CtoPoolArc,
@@ -53,21 +54,17 @@ impl<B: Block> CtoStrongArcInner for BlockAllocator<B>
 
 impl<B: Block> BlockAllocator<B>
 {
-	const CacheLineSize: usize = 64;
-	
-	/// block_size is a minimum of 256 and could be 512 for systems with AVX512 CPU instructions.
-	pub fn new(number_of_blocks: usize, cto_pool_arc: &CtoPoolArc) -> CtoStrongArc<Self>
+	/// block_size is a minimum of 64 and could be 512 for systems with AVX512 CPU instructions.
+	pub fn new(number_of_blocks: usize, block_size: BlockSize, cto_pool_arc: &CtoPoolArc) -> CtoStrongArc<Self>
 	{
-		assert!(B::BlockSizeInBytes.is_power_of_two(), "BlockSizeInBytes must be a power of two");
-		assert!(B::BlockSizeInBytes >= Self::CacheLineSize, "BlockSizeInBytes must be be equal to or greater than cache-line size");
 		assert_ne!(number_of_blocks, 0, "number_of_blocks must not be zero");
 		
 		let maximum_block_pointer_index = number_of_blocks - 1;
 		assert!(maximum_block_pointer_index < BlockPointer::<B>::ExclusiveMaximumBlockPointer, "maximum_block_pointer_index must be less than ExclusiveMaximumBlockPointer '{}'", BlockPointer::<B>::ExclusiveMaximumBlockPointer);
 		
-		let capacity = number_of_blocks * B::BlockSizeInBytes;
+		let capacity = block_size.total_memory_required_in_bytes(number_of_blocks);
 		
-		let memory_base_pointer = cto_pool_arc.aligned_allocate_or_panic(B::BlockSizeInBytes, capacity);
+		let memory_base_pointer = cto_pool_arc.aligned_allocate_or_panic(block_size.as_usize(), capacity);
 		
 		let mut this: NonNull<Self> = cto_pool_arc.aligned_allocate_or_panic_of_type(8, size_of::<Self>() + BlockMetaDataItems::<B>::size_of(number_of_blocks));
 		
@@ -75,6 +72,7 @@ impl<B: Block> BlockAllocator<B>
 		{
 			let this = this.as_mut();
 			write(&mut this.reference_counter, Self::new_reference_counter());
+			write(&mut this.block_size, block_size);
 			write(&mut this.memory_base_pointer, memory_base_pointer);
 			write(&mut this.exclusive_end_address, memory_base_pointer.offset(capacity));
 			write(&mut this.cto_pool_arc, cto_pool_arc.clone());
@@ -91,9 +89,14 @@ impl<B: Block> BlockAllocator<B>
 	/// Allocate
 	pub fn allocate(block_allocator: &CtoStrongArc<Self>, requested_size: usize) -> Result<NonNull<Chains<B>>, ()>
 	{
-		let mut chains = Chains::new(block_allocator)?;
-		
-		let (number_of_blocks_required, _capacity_in_use_of_last_chain) = B::number_of_blocks_required_and_capacity_in_use_of_last_chain(requested_size);
+		let chains = Chains::new(block_allocator)?;
+		block_allocator.allocate_internal(requested_size, chains)
+	}
+	
+	#[inline(always)]
+	fn allocate_internal(&self, requested_size: usize, mut chains: NonNull<Chains<B>>) -> Result<NonNull<Chains<B>>, ()>
+	{
+		let number_of_blocks_required = self.block_size.number_of_blocks_required(requested_size);
 		if number_of_blocks_required == 0
 		{
 			return Ok(chains)
@@ -103,7 +106,7 @@ impl<B: Block> BlockAllocator<B>
 		
 		let mut number_of_blocks_remaining_to_find = number_of_blocks_required;
 		
-		let (head_of_chains_linked_list, chain_length) = block_allocator.grab_a_chain(number_of_blocks_remaining_to_find);
+		let (head_of_chains_linked_list, chain_length) = self.grab_a_chain(number_of_blocks_remaining_to_find);
 		if head_of_chains_linked_list.is_null()
 		{
 			unsafe { drop_in_place(chains.as_ptr()) };
@@ -115,8 +118,8 @@ impl<B: Block> BlockAllocator<B>
 		number_of_blocks_remaining_to_find -= chain_length;
 		while number_of_blocks_remaining_to_find != 0
 		{
-			let (next_chain, chain_length) = block_allocator.grab_a_chain(number_of_blocks_remaining_to_find);
-			let previous_chain_block_meta_data = block_allocator.block_meta_data_unchecked(previous_chain);
+			let (next_chain, chain_length) = self.grab_a_chain(number_of_blocks_remaining_to_find);
+			let previous_chain_block_meta_data = self.block_meta_data_unchecked(previous_chain);
 			if next_chain.is_null()
 			{
 				// If this isn't done, then who knows what we might free in `drop()`.
@@ -131,7 +134,7 @@ impl<B: Block> BlockAllocator<B>
 			number_of_blocks_remaining_to_find -= chain_length;
 		}
 		
-		block_allocator.block_meta_data_unchecked(previous_chain).set_next_chain(BlockPointer::Null);
+		self.block_meta_data_unchecked(previous_chain).set_next_chain(BlockPointer::Null);
 		
 		B::P::flush_non_null(chains);
 		

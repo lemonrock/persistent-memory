@@ -8,7 +8,7 @@ trait NonNullExt<T>
 	fn offset(self, offset: usize) -> Self;
 	
 	#[inline(always)]
-	fn difference(self, larger_pointer: Self) -> usize;
+	fn relative_memory_address(self, larger_pointer: Self) -> usize;
 	
 	#[inline(always)]
 	fn longer_as_ref<'long>(self) -> &'long T;
@@ -25,7 +25,7 @@ impl<T> NonNullExt<T> for NonNull<T>
 	}
 	
 	#[inline(always)]
-	fn difference(self, larger_pointer: Self) -> usize
+	fn relative_memory_address(self, larger_pointer: Self) -> usize
 	{
 		let larger_pointer = larger_pointer.as_ptr() as usize;
 		let self_pointer = self.as_ptr() as usize;

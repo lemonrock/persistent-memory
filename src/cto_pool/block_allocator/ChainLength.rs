@@ -44,7 +44,7 @@ impl ChainLength
 	#[inline(always)]
 	pub(crate) fn as_capacity<B: Block>(self) -> usize
 	{
-		self.as_length() * B::BlockSizeInBytes
+		B::BlockSizeInBytes.size_of_chain_in_bytes(self.as_length())
 	}
 	
 	#[inline(always)]
@@ -72,11 +72,5 @@ impl ChainLength
 	{
 		debug_assert!(&shorter_chain_length < &self, "shorter_chain_length is not less than self");
 		ChainLength::from_length(self.as_length() - shorter_chain_length.as_length())
-	}
-	
-	#[inline(always)]
-	pub(crate) fn bytes<B: Block>(self) -> usize
-	{
-		self.as_length() * B::BlockSizeInBytes
 	}
 }

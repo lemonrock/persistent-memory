@@ -27,6 +27,7 @@ include!("BlockAllocator.rs");
 include!("BlockMetaData.rs");
 include!("BlockMetaDataItems.rs");
 include!("BlockPointer.rs");
+include!("BlockSize.rs");
 include!("Chain.rs");
 include!("ChainLength.rs");
 include!("Chains.rs");

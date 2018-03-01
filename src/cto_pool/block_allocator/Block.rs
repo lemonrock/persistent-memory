@@ -8,22 +8,6 @@ pub trait Block: Copy
 	/// How are blocks persisted?
 	type P: Persistence;
 	
-	/// Must be a power of two.
-	const BlockSizeInBytes: usize;
-	
-	#[doc(hidden)]
-	#[inline(always)]
-	fn number_of_blocks_required_and_capacity_in_use_of_last_chain(requested_size: usize) -> (usize, usize)
-	{
-		let remainder = requested_size % Self::BlockSizeInBytes;
-		
-		if remainder == 0
-		{
-			(requested_size / Self::BlockSizeInBytes, Self::BlockSizeInBytes)
-		}
-		else
-		{
-			((requested_size / Self::BlockSizeInBytes) + 1, remainder)
-		}
-	}
+	/// Block size in bytes.
+	const BlockSizeInBytes: BlockSize;
 }

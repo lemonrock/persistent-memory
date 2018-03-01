@@ -26,7 +26,7 @@ impl<B: Block> BlockPointer<B>
 	#[inline(always)]
 	pub(crate) fn subsequent_chain_start_address(&self, memory_base_pointer: NonNull<u8>, chain_length: ChainLength) -> NonNull<u8>
 	{
-		self.expand_to_pointer_to_memory_unchecked(memory_base_pointer).offset(chain_length.bytes::<B>())
+		self.expand_to_pointer_to_memory_unchecked(memory_base_pointer).offset(chain_length.as_capacity::<B>())
 	}
 	
 	#[inline(always)]
@@ -34,13 +34,13 @@ impl<B: Block> BlockPointer<B>
 	{
 		debug_assert!(block_address.as_ptr() >= memory_base_pointer.as_ptr(), "block_address can not be less than memory_base_pointer");
 		
-		let difference = memory_base_pointer.difference(block_address);
-		debug_assert_eq!(difference % B::BlockSizeInBytes, 0, "difference must be a multiple of BlockSizeInBytes");
+		let relative_memory_address = memory_base_pointer.relative_memory_address(block_address);
+		debug_assert!(B::BlockSizeInBytes.offset_into_block_is_zero(relative_memory_address), "relative_memory_address must be a multiple of BlockSizeInBytes");
 		
-		debug_assert_ne!(difference, Self::NullSentinel as usize, "difference can not be the NullSentinel");
+		debug_assert_ne!(relative_memory_address, Self::NullSentinel as usize, "relative_memory_address can not be the NullSentinel");
 		
-		let index = difference / B::BlockSizeInBytes;
-		debug_assert!(index < Self::ExclusiveMaximumBlockPointer, "index must be less than the ExclusiveMaximumBlockPointer, {}", Self::ExclusiveMaximumBlockPointer);
+		let index = B::BlockSizeInBytes.block_index(relative_memory_address);
+		debug_assert!((index as usize) < Self::ExclusiveMaximumBlockPointer, "index must be less than the ExclusiveMaximumBlockPointer, {}", Self::ExclusiveMaximumBlockPointer);
 		
 		BlockPointer::new(index as u32)
 	}
@@ -50,7 +50,7 @@ impl<B: Block> BlockPointer<B>
 	{
 		debug_assert!(self.is_not_null(), "this pointer is null");
 		
-		memory_base_pointer.offset(B::BlockSizeInBytes * (self.0 as usize))
+		memory_base_pointer.offset(B::BlockSizeInBytes.relative_memory_address(self.0))
 	}
 	
 	#[inline(always)]
