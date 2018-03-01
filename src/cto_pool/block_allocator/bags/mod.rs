@@ -2,7 +2,7 @@
 // Copyright © 2017 The developers of nvml. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/lemonrock/nvml/master/COPYRIGHT.
 
 
-use super::super::Persistence;
+use super::flush_struct;
 use super::super::CtoPoolArc;
 use super::super::CtoSafe;
 use super::AtomicBlockPointer;

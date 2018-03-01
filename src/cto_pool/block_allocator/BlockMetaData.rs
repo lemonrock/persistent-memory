@@ -153,6 +153,6 @@ impl<B: Block> BlockMetaData<B>
 	#[inline(always)]
 	fn persist(&self)
 	{
-		B::P::flush_struct(self);
+		flush_struct(self);
 	}
 }

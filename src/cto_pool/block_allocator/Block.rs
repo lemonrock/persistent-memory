@@ -5,9 +5,6 @@
 /// A block
 pub trait Block: Copy
 {
-	/// How are blocks persisted?
-	type P: Persistence;
-	
 	/// Block size in bytes.
 	const BlockSizeInBytes: BlockSize;
 }

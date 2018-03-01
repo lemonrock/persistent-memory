@@ -136,7 +136,7 @@ impl<B: Block> BlockAllocator<B>
 		
 		self.block_meta_data_unchecked(previous_chain).set_next_chain(BlockPointer::Null);
 		
-		B::P::flush_non_null(chains);
+		flush_non_null(chains);
 		
 		Ok(chains)
 	}

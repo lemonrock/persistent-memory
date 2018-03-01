@@ -35,3 +35,6 @@ include!("NonNullExt.rs");
 include!("PowerOfTwo.rs");
 include!("RestartCopyFromAt.rs");
 include!("RestartCopyIntoAt.rs");
+
+
+include!("FLUSH_HACKS.rs");
