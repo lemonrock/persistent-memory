@@ -51,6 +51,13 @@ quick_error!
             from()
 		}
 		
+		/// Invalid line in the `/proc` map file for this process.
+		InvalidLineInProcMap(description: &'static str)
+		{
+			description(description)
+            display("Could not memory map because proc map has an invalid line '{}'", description)
+		}
+		
 		/// The `mmap` libc called failed.
 		MMapFailed
 		{

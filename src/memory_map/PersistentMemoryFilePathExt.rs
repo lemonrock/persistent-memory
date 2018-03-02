@@ -5,10 +5,14 @@
 /// An extension trait to provide methods to file paths used as memory files, such as DAX devices.
 pub trait PersistentMemoryFilePathExt
 {
-	/// memory map (`mmap`) persistent memory file
+	/// Memory map (`mmap`) persistent memory file.
+	/// Returns pointer to mapped address and boolean indicating whether the Linux 4.15+ `MAP_SYNC` flag was used successfully.
+	/// If a minimum_address_hint_and_alignment is supplied, then `MAP_FIXED` is used to try to fix the mapping at a particular location.
+	/// `offset` should normally be zero.
+	/// The returned address will need to be un-mapped with `munmap`.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn memory_map(&self, read_only: bool, alignment: Option<usize>) -> Result<*mut u8, CouldNotMemoryMapError>;
+	fn memory_map(&self, read_only: bool, minimum_address_hint_and_alignment: Option<(*mut u8, usize)>, offset: u64) -> Result<(*mut u8, bool), CouldNotMemoryMapError>;
 	
 	/// Persistent memory file size for use with `mmap()`.
 	#[inline(always)]
@@ -19,26 +23,14 @@ pub trait PersistentMemoryFilePathExt
 	fn file_size(&self) -> Result<u64, CouldNotObtainDaxDeviceStatisticError>;
 }
 
-fn util_map_hint(size: u64, alignment: usize) -> Option<*mut u8>
-{
-	unimplemented!();
-}
-
-use ::std::ptr::null_mut;
-
 impl PersistentMemoryFilePathExt for Path
 {
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn memory_map(&self, read_only: bool, alignment: Option<usize>) -> Result<*mut u8, CouldNotMemoryMapError>
+	fn memory_map(&self, read_only: bool, minimum_address_hint_and_alignment: Option<(*mut u8, usize)>, offset: u64) -> Result<(*mut u8, bool), CouldNotMemoryMapError>
 	{
-//		use ::libc::mmap;
-//		use ::libc::MAP_SHARED;
-		use ::libc::PROT_READ;
-		use ::libc::PROT_WRITE;
-		
-		
 		let size = self.memory_file_size_for_use_with_memory_map()?;
+		let size = (size - offset) as usize;
 		
 		let protection = if read_only
 		{
@@ -49,16 +41,22 @@ impl PersistentMemoryFilePathExt for Path
 			PROT_READ | PROT_WRITE
 		};
 		
-		let address_hint: *mut u8 = if let Some(alignment) = alignment
+		let mut flags = MAP_SHARED;
+		
+		let address: *mut c_void = if let Some((minimum_address_hint, alignment)) = minimum_address_hint_and_alignment
 		{
-			let address_hint = util_map_hint(size, alignment);
+			debug_assert!(alignment.is_power_of_two(), "alignment must be a power of two");
+			
+			let address_hint = find_lowest_unoccupied_address_in_process_map(minimum_address_hint, size, alignment)?;
 			if address_hint.is_none()
 			{
-				return Err(CouldNotMemoryMapError::CouldNotFindAContiguousRegionToMemoryMapInto(size, alignment));
+				return Err(CouldNotMemoryMapError::CouldNotFindAContiguousRegionToMemoryMapInto(size as u64, alignment));
 			}
 			else
 			{
-				address_hint.unwrap()
+				flags |= MAP_FIXED;
+				
+				address_hint.unwrap() as *mut c_void
 			}
 		}
 		else
@@ -66,117 +64,53 @@ impl PersistentMemoryFilePathExt for Path
 			null_mut()
 		};
 		
-		let address = null_mut(); //util_map_sync(address_hint, size, protection, flags, 0, map_sync_ptr) as *mut u8;
+		let mmap_offset = offset as i64;
 		
-		if address.is_null()
-		{
-			Err(CouldNotMemoryMapError::MMapFailed)
-		}
-		else
-		{
-			Ok(address)
-		}
+		let memory_map_file = OpenOptions::new().read(true).write(true).open(self)?;
+		let memory_map_file_descriptor = memory_map_file.as_raw_fd();
 		
-		/*
-			#ifndef MAP_SYNC
-			#define MAP_SYNC 0x80000
-			#endif
+		// Linux 4.15 (28th January 2018) introduces the `MAP_SYNC` and `MAP_SHARED_VALIDATE` flags to `mmap(2)`, a mechanism that implements synchronous page faults for DAX mappings to make flushing of DAX mappings possible from userspace so that they can be flushed on finer than page granularity and also avoid the overhead of a syscall.
+		// It arranges for any filesystem metadata updates that may be required to satisfy a write fault to also be flushed ("on disk") before the kernel returns to userspace from the fault handler.
+		// Effectively every write-fault that dirties metadata completes an `fsync()` before returning from the fault handler.
+		// The new `MAP_SHARED_VALIDATE` mapping type guarantees that the `MAP_SYNC` flag is validated as supported by the filesystem's `mmap()` implementation.
+		#[cfg(any(target_os = "android", target_os = "linux"))]
+		{
+			const MAP_SYNC: i32 = 0x80000;
+			const MAP_SHARED_VALIDATE: i32 = 0x03;
+			let new_linux_flags = flags | MAP_SHARED_VALIDATE | MAP_SYNC;
 			
-			#ifndef MAP_SHARED_VALIDATE
-			#define MAP_SHARED_VALIDATE 0x03
-			#endif
-			
-			 // util_map_sync -- memory map given file into memory, if MAP_SHARED flag is
-			 // provided it attempts to use MAP_SYNC flag. Otherwise it fallbacks to
-			 // mmap(2).
-			void *
-			util_map_sync(void *addr, size_t len, int proto, int flags, int fd,
-				os_off_t offset, int *map_sync)
+			let address = unsafe { mmap(address, size, protection, new_linux_flags, memory_map_file_descriptor, mmap_offset) };
+			if address == MAP_FAILED
 			{
-				LOG(15, "addr %p len %zu proto %x flags %x fd %d offset %ld "
-					"map_sync %p", addr, len, proto, flags, fd, offset, map_sync);
-			
-				if (map_sync)
-					*map_sync = 0;
-			
-				/* if map_sync is NULL do not even try to mmap with MAP_SYNC flag */
-				if (!map_sync || flags & MAP_PRIVATE)
-					return mmap(addr, len, proto, flags, fd, offset);
-			
-				/* MAP_SHARED */
-				void *ret = mmap(addr, len, proto,
-						flags | MAP_SHARED_VALIDATE | MAP_SYNC,
-						fd, offset);
-				if (ret != MAP_FAILED) {
-					LOG(4, "mmap with MAP_SYNC succeeded");
-					*map_sync = 1;
-					return ret;
+				// Try again without MAP_SHARED_VALIDATE | MAP_SYNC as these are very new.
+				let address = unsafe { mmap(address, size, protection, flags, memory_map_file_descriptor, mmap_offset) };
+				if address == MAP_FAILED
+				{
+					Err(CouldNotMemoryMapError::MMapFailed)
 				}
-			
-				if (errno == EINVAL || errno == ENOTSUP) {
-					LOG(4, "mmap with MAP_SYNC not supported");
-					return mmap(addr, len, proto, flags, fd, offset);
+				else
+				{
+					Ok((address as *mut u8, false))
 				}
-			
-				/* other error */
-				return MAP_FAILED;
 			}
-			
-
-/*
- * util_map_hint -- determine hint address for mmap()
- *
- * If PMEM_MMAP_HINT environment variable is not set, we let the system to pick
- * the randomized mapping address.  Otherwise, a user-defined hint address
- * is used.
- *
- * ALSR in 64-bit Linux kernel uses 28-bit of randomness for mmap
- * (bit positions 12-39), which means the base mapping address is randomized
- * within [0..1024GB] range, with 4KB granularity.  Assuming additional
- * 1GB alignment, it results in 1024 possible locations.
- *
- * Configuring the hint address via PMEM_MMAP_HINT environment variable
- * disables address randomization.  In such case, the function will search for
- * the first unused, properly aligned region of given size, above the specified
- * address.
- */
-char *
-util_map_hint(size_t len, size_t req_align)
-{
-	LOG(3, "len %zu req_align %zu", len, req_align);
-
-	char *hint_addr = MAP_FAILED;
-
-	/* choose the desired alignment based on the requested length */
-	size_t align = util_map_hint_align(len, req_align);
-
-	if (Mmap_no_random) {
-		LOG(4, "user-defined hint %p", (void *)Mmap_hint);
-		hint_addr = util_map_hint_unused((void *)Mmap_hint, len, align);
-	} else {
-		/*
-		 * Create dummy mapping to find an unused region of given size.
-		 * Request for increased size for later address alignment.
-		 * Use MAP_PRIVATE with read-only access to simulate
-		 * zero cost for overcommit accounting.  Note: MAP_NORESERVE
-		 * flag is ignored if overcommit is disabled (mode 2).
-		 */
-		char *addr = mmap(NULL, len + align, PROT_READ,
-					MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-		if (addr != MAP_FAILED) {
-			LOG(4, "system choice %p", addr);
-			hint_addr = (char *)roundup((uintptr_t)addr, align);
-			munmap(addr, len + align);
+			else
+			{
+				Ok((address as *mut u8, true))
+			}
 		}
-	}
-	LOG(4, "hint %p", hint_addr);
-
-	return hint_addr;
-}
-		*/
 		
-		
-		
+		#[cfg(not(any(target_os = "android", target_os = "linux")))]
+		{
+			let address = unsafe { mmap(address, size, protection, flags, memory_map_file_descriptor, mmap_offset) };
+			if address == MAP_FAILED
+			{
+				Err(CouldNotMemoryMapError::MMapFailed)
+			}
+			else
+			{
+				Ok((address as *mut u8, false))
+			}
+		}
 	}
 	
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
