@@ -12,7 +12,7 @@ pub trait PersistentMemoryFilePathExt
 	/// The returned address will need to be un-mapped with `munmap`.
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn memory_map(&self, read_only: bool, minimum_address_hint_and_alignment: Option<(*mut u8, usize)>, offset: u64) -> Result<(*mut u8, bool), CouldNotMemoryMapError>;
+	fn memory_map(&self, read_only: bool, minimum_address_hint_and_alignment: Option<(*mut u8, usize)>, offset: u64) -> Result<MappedMemory, CouldNotMemoryMapError>;
 	
 	/// Persistent memory file size for use with `mmap()`.
 	#[inline(always)]
@@ -27,7 +27,7 @@ impl PersistentMemoryFilePathExt for Path
 {
 	#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 	#[inline(always)]
-	fn memory_map(&self, read_only: bool, minimum_address_hint_and_alignment: Option<(*mut u8, usize)>, offset: u64) -> Result<(*mut u8, bool), CouldNotMemoryMapError>
+	fn memory_map(&self, read_only: bool, minimum_address_hint_and_alignment: Option<(*mut u8, usize)>, offset: u64) -> Result<MappedMemory, CouldNotMemoryMapError>
 	{
 		let size = self.memory_file_size_for_use_with_memory_map()?;
 		let size = (size - offset) as usize;
@@ -90,12 +90,12 @@ impl PersistentMemoryFilePathExt for Path
 				}
 				else
 				{
-					Ok((address as *mut u8, false))
+					Ok(MappedMemory((address as *mut u8).to_non_null(), size, false))
 				}
 			}
 			else
 			{
-				Ok((address as *mut u8, true))
+				Ok(MappedMemory((address as *mut u8).to_non_null(), size, true))
 			}
 		}
 		
@@ -108,7 +108,7 @@ impl PersistentMemoryFilePathExt for Path
 			}
 			else
 			{
-				Ok((address as *mut u8, false))
+				Ok(MappedMemory((address as *mut u8).to_non_null(), size, false))
 			}
 		}
 	}

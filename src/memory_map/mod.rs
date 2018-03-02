@@ -3,6 +3,7 @@
 
 
 use super::Alignment;
+use super::ToNonNull;
 use super::dax::CouldNotObtainDaxDeviceStatisticError;
 use super::dax::DaxDevicePathExt;
 #[cfg(unix)] use ::libc::sysconf;
@@ -25,11 +26,13 @@ use super::dax::DaxDevicePathExt;
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::io::BufReader;
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::os::unix::io::AsRawFd;
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::path::Path;
+#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::ptr::NonNull;
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] use ::std::ptr::null_mut;
 
 
 include!("CouldNotMemoryMapError.rs");
 include!("find_lowest_unoccupied_address_in_process_map.rs");
 include!("find_random_memory_map_unoccupied_address.rs");
+include!("MappedMemory.rs");
 include!("memory_map_page_size.rs");
 include!("PersistentMemoryFilePathExt.rs");
