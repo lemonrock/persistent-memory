@@ -59,6 +59,7 @@ pub extern crate parking_lot;
 extern crate spin_locks;
 extern crate std_unicode;
 extern crate syscall_alt;
+#[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))] #[macro_use] extern crate text_io;
 #[cfg(target_os = "windows")] extern crate winapi;
 
 
@@ -68,6 +69,9 @@ use ::std::ptr::NonNull;
 /// CTO Pool
 pub mod cto_pool;
 
+/// Path support for DAX (Direct Access) devices.
+pub mod dax;
+
 /// Hyper Thread support functions.
 pub mod hyper_thread;
 
@@ -76,6 +80,9 @@ pub mod intrinsics;
 
 /// Specialized jemalloc support.
 pub mod jemalloc;
+
+/// Memory map (`mmap`) support functionality.
+pub mod memory_map;
 
 /// Persistent memory operations.
 ///
@@ -92,10 +99,8 @@ pub mod jemalloc;
 /// 7. Pedro Ramalhete & Andreia Correia argue that (4) does not require a `pfence()` before and a `pfence()` after on x86_64 because read-modify-write instructions (CAS, fetch_add, exchange, etc) ensure order for `clflushopt` and `clwb`.
 pub mod persistent_memory_operations;
 
-/// Path support for DAX (Direct Access) devices and mmap-able files.
-pub mod path;
 
-
+include!("Alignment.rs");
 include!("ExtendedNonNull.rs");
 include!("IsNotNull.rs");
 include!("ToNonNull.rs");

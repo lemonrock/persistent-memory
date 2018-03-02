@@ -33,6 +33,9 @@ syscall-alt = "0.0.12"
 [target.'cfg(not(all(target_feature = "rdrnd", any(target_arch = "x86", target_arch = "x86_64"))))'.dependencies]
 rand = "0.4"
 
+[target.'cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))'.dependencies]
+text_io = "0.1.7"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 kernel32-sys = "0.2"
 winapi = "0.3"
