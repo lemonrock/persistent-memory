@@ -36,6 +36,22 @@ impl Default for BlockSize
 impl BlockSize
 {
 	#[inline(always)]
+	fn for_alignment(alignment: usize) -> Self
+	{
+		use self::BlockSize::*;
+		
+		match alignment
+		{
+			64 => _64,
+			128 => _128,
+			256 => _256,
+			512 => _512,
+			4096 => _4096,
+			_ => panic!("Unrecognised alignment to convert to BlockSize '{}'", alignment)
+		}
+	}
+	
+	#[inline(always)]
 	fn total_memory_required_in_bytes(self, number_of_blocks: usize) -> usize
 	{
 		self.as_usize() * number_of_blocks

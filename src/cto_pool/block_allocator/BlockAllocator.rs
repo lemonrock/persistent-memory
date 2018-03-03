@@ -5,13 +5,13 @@
 /// Stored in Persistent Memory.
 /// Uses `#[repr(C)]` to prevent reordering of fields.
 /// Variable-sized data is stored after this struct, and so it can not be placed on the stack.
-#[repr(C, align(4096))] // `align(Self::Alignment)`.
+#[repr(C, align(4096))] // 4096 is the same as the `Self::Alignment` constant below - the value of `align(X)` (ie `X`) must be kept the same with the constant `Self::Alignment`.
 pub struct BlockAllocator
 {
 	number_of_blocks: usize,
+	block_size: BlockSize,
 	
 	// Can be computed every time but stored for efficiency.
-	block_size: BlockSize,
 	blocks_memory_inclusive_start_pointer: NonNull<u8>,
 	blocks_memory_exclusive_end_pointer: NonNull<u8>,
 	blocks_meta_data_items_inclusive_start_pointer: NonNull<BlockMetaDataItems>,
@@ -51,11 +51,11 @@ impl BlockAllocator
 			return 0;
 		}
 		
-		const _4096: BlockSize = BlockSize::_4096;
+		let alignment_block_size: BlockSize = BlockSize::for_alignment(Self::Alignment);
 		
-		let number_of_4096_sized_blocks = (memory_capacity_available_in_bytes - struct_size) / (_4096.as_usize() + size_of::<BlockMetaData>());
+		let number_of_4096_sized_blocks = (memory_capacity_available_in_bytes - struct_size) / (alignment_block_size.as_usize() + size_of::<BlockMetaData>());
 		
-		let scalar = _4096.as_usize() / block_size.as_usize();
+		let scalar = alignment_block_size.as_usize() / block_size.as_usize();
 		
 		let number_of_blocks = number_of_4096_sized_blocks * scalar;
 		
@@ -123,7 +123,7 @@ impl BlockAllocator
 		self.grab_a_chain_exactly_for(number_of_blocks_required)
 	}
 	
-	/// Allocate chains
+	/// Allocate chains.
 	pub fn allocate_chains(&self, requested_size: usize, cto_pool_arc: &CtoPoolArc) -> Result<NonNull<Chains>, ()>
 	{
 		let mut chains = Chains::new(self, cto_pool_arc)?;
