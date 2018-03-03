@@ -118,8 +118,6 @@ impl BlockAllocator
 	#[inline(always)]
 	fn initialize(&mut self, number_of_blocks: usize, block_size: BlockSize, blocks_memory_inclusive_start_pointer: NonNull<u8>, blocks_memory_exclusive_end_pointer: NonNull<u8>, blocks_meta_data_items_inclusive_start_pointer: NonNull<BlockMetaDataItems>)
 	{
-		let blocks_capacity = Self::blocks_capacity(number_of_blocks, block_size);
-		
 		unsafe
 		{
 			write(&mut self.number_of_blocks, number_of_blocks);
