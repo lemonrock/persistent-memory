@@ -37,30 +37,6 @@ impl BlockAllocator
 {
 	const Alignment: usize = 4096;
 	
-	#[inline(always)]
-	fn offset_to_start_of_variable_length_memory() -> usize
-	{
-		size_of::<Self>().round_up_to_alignment(Self::Alignment)
-	}
-	
-	#[inline(always)]
-	fn blocks_capacity(number_of_blocks: usize, block_size: BlockSize) -> usize
-	{
-		block_size.total_memory_required_in_bytes(number_of_blocks)
-	}
-	
-	#[inline(always)]
-	fn block_meta_data_items(&self) -> &BlockMetaDataItems
-	{
-		self.blocks_meta_data_items_inclusive_start_pointer.reference()
-	}
-	
-	#[inline(always)]
-	fn block_meta_data_items_mut(&mut self) -> &mut BlockMetaDataItems
-	{
-		self.blocks_meta_data_items_inclusive_start_pointer.mutable_reference()
-	}
-	
 	/// Calculate how many blocks can be assigned.
 	/// Returns 0 (zero) if nothing is possible.
 	#[inline(always)]
@@ -99,32 +75,33 @@ impl BlockAllocator
 	/// block_size is a minimum of 64 and could be 512 for systems with AVX512 CPU instructions.
 	pub fn new(unaligned_address: usize, number_of_blocks: usize, block_size: BlockSize) -> NonNull<Self>
 	{
-		assert_ne!(number_of_blocks, 0, "number_of_blocks must not be zero");
-		assert!(number_of_blocks < BlockPointer::InclusiveMaximumNumberOfBlocks, "number_of_blocks '{}' can not exceed InclusiveMaximumNumberOfBlocks '{}'", number_of_blocks, BlockPointer::InclusiveMaximumNumberOfBlocks);
-		
 		let aligned_address = unaligned_address.round_up_to_alignment(Self::Alignment);
-		let blocks_memory_inclusive_start_pointer = aligned_address + Self::offset_to_start_of_variable_length_memory();
-		let blocks_capacity = Self::blocks_capacity(number_of_blocks, block_size);
-		let blocks_memory_exclusive_end_pointer = blocks_memory_inclusive_start_pointer + blocks_capacity;
-		let blocks_meta_data_items_inclusive_start_pointer = blocks_memory_exclusive_end_pointer.round_up_to_alignment(Self::Alignment);
 		
 		let mut this = (aligned_address as *mut Self).to_non_null();
 		
-		this.mutable_reference().initialize(number_of_blocks, block_size, (blocks_memory_inclusive_start_pointer as *mut u8).to_non_null(), (blocks_memory_exclusive_end_pointer as *mut u8).to_non_null(), (blocks_meta_data_items_inclusive_start_pointer as *mut BlockMetaDataItems).to_non_null());
+		this.mutable_reference().initialize(aligned_address, number_of_blocks, block_size);
 		
 		this
 	}
 	
 	#[inline(always)]
-	fn initialize(&mut self, number_of_blocks: usize, block_size: BlockSize, blocks_memory_inclusive_start_pointer: NonNull<u8>, blocks_memory_exclusive_end_pointer: NonNull<u8>, blocks_meta_data_items_inclusive_start_pointer: NonNull<BlockMetaDataItems>)
+	fn initialize(&mut self, aligned_address: usize, number_of_blocks: usize, block_size: BlockSize)
 	{
+		assert_ne!(number_of_blocks, 0, "number_of_blocks must not be zero");
+		assert!(number_of_blocks < BlockPointer::InclusiveMaximumNumberOfBlocks, "number_of_blocks '{}' can not exceed InclusiveMaximumNumberOfBlocks '{}'", number_of_blocks, BlockPointer::InclusiveMaximumNumberOfBlocks);
+		
+		let blocks_memory_inclusive_start_pointer = aligned_address + Self::offset_to_start_of_variable_length_memory();
+		let blocks_capacity = Self::blocks_capacity(number_of_blocks, block_size);
+		let blocks_memory_exclusive_end_pointer = blocks_memory_inclusive_start_pointer + blocks_capacity;
+		let blocks_meta_data_items_inclusive_start_pointer = blocks_memory_exclusive_end_pointer.round_up_to_alignment(Self::Alignment);
+		
 		unsafe
 		{
 			write(&mut self.number_of_blocks, number_of_blocks);
 			write(&mut self.block_size, block_size);
-			write(&mut self.blocks_memory_inclusive_start_pointer, blocks_memory_inclusive_start_pointer);
-			write(&mut self.blocks_memory_exclusive_end_pointer, blocks_memory_exclusive_end_pointer);
-			write(&mut self.blocks_meta_data_items_inclusive_start_pointer, blocks_meta_data_items_inclusive_start_pointer);
+			write(&mut self.blocks_memory_inclusive_start_pointer, (blocks_memory_inclusive_start_pointer as *mut u8).to_non_null());
+			write(&mut self.blocks_memory_exclusive_end_pointer, (blocks_memory_exclusive_end_pointer as *mut u8).to_non_null());
+			write(&mut self.blocks_meta_data_items_inclusive_start_pointer, (blocks_meta_data_items_inclusive_start_pointer as *mut BlockMetaDataItems).to_non_null());
 			write(&mut self.bags, Bags::default());
 			
 			self.block_meta_data_items_mut().initialize(number_of_blocks);
@@ -200,6 +177,30 @@ impl BlockAllocator
 	pub(crate) fn to_non_null(&self) -> NonNull<Self>
 	{
 		(self as *const Self as *mut Self).to_non_null()
+	}
+	
+	#[inline(always)]
+	fn offset_to_start_of_variable_length_memory() -> usize
+	{
+		size_of::<Self>().round_up_to_alignment(Self::Alignment)
+	}
+	
+	#[inline(always)]
+	fn blocks_capacity(number_of_blocks: usize, block_size: BlockSize) -> usize
+	{
+		block_size.total_memory_required_in_bytes(number_of_blocks)
+	}
+	
+	#[inline(always)]
+	fn block_meta_data_items(&self) -> &BlockMetaDataItems
+	{
+		self.blocks_meta_data_items_inclusive_start_pointer.reference()
+	}
+	
+	#[inline(always)]
+	fn block_meta_data_items_mut(&mut self) -> &mut BlockMetaDataItems
+	{
+		self.blocks_meta_data_items_inclusive_start_pointer.mutable_reference()
 	}
 	
 	#[inline(always)]
