@@ -21,7 +21,7 @@ pub struct BlockAllocator
 	
 	// We store variable length Blocks at a Self::Alignment byte alignment after the BlockAllocator, ie immediately after the end.
 	
-	// We store variable length BlockMetaDataItems<B> at a Self::Alignment byte alignment after the Blocks.
+	// We store variable length BlockMetaDataItems at a Self::Alignment byte alignment after the Blocks.
 }
 
 impl CtoSafe for BlockAllocator
