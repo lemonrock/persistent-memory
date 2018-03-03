@@ -4,16 +4,16 @@
 
 #[derive(Debug)]
 #[repr(C)]
-pub(crate) struct BlockMetaData<B: Block>
+pub(crate) struct BlockMetaData
 {
 	chain_length_and_bag_stripe_index: AtomicChainLengthAndBagStripeIndex,
-	next: AtomicBlockPointer<B>,
-	previous: AtomicBlockPointer<B>,
+	next: AtomicBlockPointer,
+	previous: AtomicBlockPointer,
 	
-	next_chain: Cell<BlockPointer<B>>,
+	next_chain: Cell<BlockPointer>,
 }
 
-impl<B: Block> BlockMetaData<B>
+impl BlockMetaData
 {
 	#[inline(always)]
 	fn default() -> Self
@@ -29,11 +29,11 @@ impl<B: Block> BlockMetaData<B>
 	}
 }
 
-impl<B: Block> BlockMetaData<B>
+impl BlockMetaData
 {
 	// Part of Drop logic for Chains struct.
 	#[inline(always)]
-	pub(crate) fn recycle_chains_into_block_allocator(&self, block_allocator: &BlockAllocator<B>, our_block_pointer: BlockPointer<B>)
+	pub(crate) fn recycle_chains_into_block_allocator(&self, block_allocator: &BlockAllocator, our_block_pointer: BlockPointer)
 	{
 		let next_chain = self.get_next_chain();
 		if next_chain.is_not_null()
@@ -51,7 +51,7 @@ impl<B: Block> BlockMetaData<B>
 	// For the snapped off chain, we know it (inclusive) start address and exclusive end address. The exclusive end address might be the start of another chain.
 	// NOTE: On entry, this chain MUST have been 'taken', ie the memory must be in use, ie we have 'locked' it for use by us.
 	#[inline(always)]
-	pub(crate) fn snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(&self, our_block_pointer: BlockPointer<B>, memory_base_pointer: NonNull<u8>, our_shorter_chain_length: ChainLength, block_allocator: &BlockAllocator<B>)
+	pub(crate) fn snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(&self, our_block_pointer: BlockPointer, memory_base_pointer: NonNull<u8>, our_shorter_chain_length: ChainLength, block_allocator: &BlockAllocator)
 	{
 		let our_chain_length = self.chain_length();
 		
@@ -60,7 +60,7 @@ impl<B: Block> BlockMetaData<B>
 		let snapped_off_chain_length = our_chain_length.subtract(our_shorter_chain_length);
 		self.acquire(our_shorter_chain_length);
 		
-		let snapped_off_chain_block_pointer = BlockPointer::block_address_to_block_pointer(memory_base_pointer, our_block_pointer.subsequent_chain_start_address(memory_base_pointer, our_shorter_chain_length));
+		let snapped_off_chain_block_pointer = BlockPointer::block_address_to_block_pointer(memory_base_pointer, our_block_pointer.subsequent_chain_start_address(memory_base_pointer, our_shorter_chain_length, block_allocator.block_size), block_allocator.block_size);
 		let snapped_off_chain_block_meta_data = block_allocator.block_meta_data_unchecked(snapped_off_chain_block_pointer);
 		snapped_off_chain_block_meta_data.acquire(snapped_off_chain_length);
 		block_allocator.receive_solitary_chain_back(snapped_off_chain_block_pointer);
@@ -79,7 +79,7 @@ impl<B: Block> BlockMetaData<B>
 	// Valid only if not in a bag.
 	// Is permitted to return a null BlockPointer.
 	#[inline(always)]
-	fn get_next_chain(&self) -> BlockPointer<B>
+	fn get_next_chain(&self) -> BlockPointer
 	{
 		debug_assert!(self.chain_length_and_bag_stripe_index().bag_stripe_index().is_none(), "can not ask for next_chain when in a bag");
 		self.next_chain.get()
@@ -88,7 +88,7 @@ impl<B: Block> BlockMetaData<B>
 	// Valid only if not in a bag.
 	// Is permitted to accept a null BlockPointer.
 	#[inline(always)]
-	fn set_next_chain(&self, new_next_chain: BlockPointer<B>)
+	fn set_next_chain(&self, new_next_chain: BlockPointer)
 	{
 		debug_assert!(self.chain_length_and_bag_stripe_index().bag_stripe_index().is_none(), "can not ask for next_chain when in a bag");
 		self.next_chain.set(new_next_chain);
@@ -127,25 +127,25 @@ impl<B: Block> BlockMetaData<B>
 	}
 	
 	#[inline(always)]
-	fn get_next(&self) -> BlockPointer<B>
+	fn get_next(&self) -> BlockPointer
 	{
 		self.next.get()
 	}
 	
 	#[inline(always)]
-	fn set_next(&self, new_next: BlockPointer<B>)
+	fn set_next(&self, new_next: BlockPointer)
 	{
 		self.next.set(new_next);
 	}
 	
 	#[inline(always)]
-	fn get_previous(&self) -> BlockPointer<B>
+	fn get_previous(&self) -> BlockPointer
 	{
 		self.previous.get()
 	}
 	
 	#[inline(always)]
-	fn set_previous(&self, new_previous: BlockPointer<B>)
+	fn set_previous(&self, new_previous: BlockPointer)
 	{
 		self.previous.set(new_previous);
 	}

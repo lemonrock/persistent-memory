@@ -24,7 +24,7 @@ impl ChainLength
 	}
 	
 	#[inline(always)]
-	fn get_bag<'bag, B: Block>(&self, bags: &'bag [Bag<B>; InclusiveMaximumChainLength]) -> &'bag Bag<B>
+	fn get_bag<'bag>(&self, bags: &'bag [Bag; InclusiveMaximumChainLength]) -> &'bag Bag
 	{
 		unsafe { bags.get_unchecked(self.as_index()) }
 	}
@@ -42,9 +42,9 @@ impl ChainLength
 	}
 	
 	#[inline(always)]
-	pub(crate) fn as_capacity<B: Block>(self) -> usize
+	pub(crate) fn as_capacity(self, block_size: BlockSize) -> usize
 	{
-		B::BlockSizeInBytes.size_of_chain_in_bytes(self.as_length())
+		block_size.size_of_chain_in_bytes(self.as_length())
 	}
 	
 	#[inline(always)]

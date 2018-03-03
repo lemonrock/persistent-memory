@@ -4,88 +4,132 @@
 
 /// Stored in Persistent Memory.
 /// Uses `#[repr(C)]` to prevent reordering of fields.
-#[repr(C)]
-pub struct BlockAllocator<B: Block>
+/// Variable-sized data is stored after this struct, and so it can not be placed on the stack.
+#[repr(C, align(4096))] // `align(Self::Alignment)`.
+pub struct BlockAllocator
 {
-	reference_counter: AtomicUsize,
+	number_of_blocks: usize,
+	
+	// Can be computed every time but stored for efficiency.
 	block_size: BlockSize,
-	memory_base_pointer: NonNull<u8>,
-	exclusive_end_address: NonNull<u8>,
-	cto_pool_arc: CtoPoolArc,
+	blocks_memory_inclusive_start_pointer: NonNull<u8>,
+	blocks_memory_exclusive_end_pointer: NonNull<u8>,
+	blocks_meta_data_items_inclusive_start_pointer: NonNull<BlockMetaDataItems>,
 	
 	// A free list.
-	bags: Bags<B>,
+	bags: Bags,
 	
-	// MUST be last item as it is variable-length.
-	block_meta_data_items: BlockMetaDataItems<B>,
+	// We store variable length Blocks at a Self::Alignment byte alignment after the BlockAllocator, ie immediately after the end.
+	
+	// We store variable length BlockMetaDataItems<B> at a Self::Alignment byte alignment after the Blocks.
 }
 
-impl<B: Block> Drop for BlockAllocator<B>
-{
-	#[inline(always)]
-	fn drop(&mut self)
-	{
-		self.cto_pool_arc.free_pointer(self.memory_base_pointer.as_ptr());
-		
-		let cto_pool_arc = self.cto_pool_arc.clone();
-		cto_pool_arc.free_pointer(self);
-	}
-}
-
-impl<B: Block> CtoSafe for BlockAllocator<B>
+impl CtoSafe for BlockAllocator
 {
 	#[inline(always)]
 	fn cto_pool_opened(&mut self, cto_pool_arc: &CtoPoolArc)
 	{
-		cto_pool_arc.write(&mut self.cto_pool_arc);
-		
 		self.bags.cto_pool_opened(cto_pool_arc)
 	}
 }
 
-impl<B: Block> CtoStrongArcInner for BlockAllocator<B>
+impl BlockAllocator
 {
+	const Alignment: usize = 4096;
+	
 	#[inline(always)]
-	fn reference_counter(&self) -> &AtomicUsize
+	fn offset_to_start_of_variable_length_memory() -> usize
 	{
-		&self.reference_counter
-	}
-}
-
-impl<B: Block> BlockAllocator<B>
-{
-	/// block_size is a minimum of 64 and could be 512 for systems with AVX512 CPU instructions.
-	pub fn new(number_of_blocks: usize, block_size: BlockSize, cto_pool_arc: &CtoPoolArc) -> CtoStrongArc<Self>
-	{
-		assert_ne!(number_of_blocks, 0, "number_of_blocks must not be zero");
-		
-		let maximum_block_pointer_index = number_of_blocks - 1;
-		assert!(maximum_block_pointer_index < BlockPointer::<B>::ExclusiveMaximumBlockPointer, "maximum_block_pointer_index must be less than ExclusiveMaximumBlockPointer '{}'", BlockPointer::<B>::ExclusiveMaximumBlockPointer);
-		
-		let mut this: NonNull<Self> = cto_pool_arc.aligned_allocate_or_panic_of_type(8, size_of::<Self>() + BlockMetaDataItems::<B>::size_of(number_of_blocks));
-		
-		this.mutable_reference().initialize(number_of_blocks, block_size, cto_pool_arc);
-		
-		CtoStrongArc::new(this)
+		size_of::<Self>().round_up_to_alignment(Self::Alignment)
 	}
 	
 	#[inline(always)]
-	fn initialize(&mut self, number_of_blocks: usize, block_size: BlockSize, cto_pool_arc: &CtoPoolArc)
+	fn blocks_capacity(number_of_blocks: usize, block_size: BlockSize) -> usize
 	{
-		let capacity = block_size.total_memory_required_in_bytes(number_of_blocks);
+		block_size.total_memory_required_in_bytes(number_of_blocks)
+	}
+	
+	#[inline(always)]
+	fn block_meta_data_items(&self) -> &BlockMetaDataItems
+	{
+		self.blocks_meta_data_items_inclusive_start_pointer.reference()
+	}
+	
+	#[inline(always)]
+	fn block_meta_data_items_mut(&mut self) -> &mut BlockMetaDataItems
+	{
+		self.blocks_meta_data_items_inclusive_start_pointer.mutable_reference()
+	}
+	
+	/// Calculate how many blocks can be assigned.
+	/// Returns 0 (zero) if nothing is possible.
+	#[inline(always)]
+	pub fn maximum_number_of_blocks(memory_capacity_available_in_bytes: usize, block_size: BlockSize) -> usize
+	{
+		// We assume a block size for the purposes of calculation that matches Self::Alignment.
+		// This means we can calculate without having to worry about alignment rounding-up rules.
 		
-		let memory_base_pointer = cto_pool_arc.aligned_allocate_or_panic(block_size.as_usize(), capacity);
+		let struct_size = Self::offset_to_start_of_variable_length_memory();
+		if memory_capacity_available_in_bytes <= struct_size
+		{
+			return 0;
+		}
+		
+		const _4096: BlockSize = BlockSize::_4096;
+		
+		let number_of_4096_sized_blocks = (memory_capacity_available_in_bytes - struct_size) / (_4096.as_usize() + size_of::<BlockMetaData>());
+		
+		let scalar = _4096.as_usize() / block_size.as_usize();
+		
+		let number_of_blocks = number_of_4096_sized_blocks * scalar;
+		
+		min(number_of_blocks, BlockPointer::InclusiveMaximumNumberOfBlocks)
+	}
+	
+	/// Size of this object.
+	#[inline(always)]
+	pub fn size_of(number_of_blocks: usize, block_size: BlockSize) -> usize
+	{
+		let aligned_struct = Self::offset_to_start_of_variable_length_memory();
+		let blocks_capacity = Self::blocks_capacity(number_of_blocks, block_size).round_up_to_alignment(Self::Alignment);
+		let meta_data = BlockMetaDataItems::size_of(number_of_blocks);
+		aligned_struct + blocks_capacity + meta_data
+	}
+	
+	/// block_size is a minimum of 64 and could be 512 for systems with AVX512 CPU instructions.
+	pub fn new(unaligned_address: usize, number_of_blocks: usize, block_size: BlockSize) -> NonNull<Self>
+	{
+		assert_ne!(number_of_blocks, 0, "number_of_blocks must not be zero");
+		assert!(number_of_blocks < BlockPointer::InclusiveMaximumNumberOfBlocks, "number_of_blocks '{}' can not exceed InclusiveMaximumNumberOfBlocks '{}'", number_of_blocks, BlockPointer::InclusiveMaximumNumberOfBlocks);
+		
+		let aligned_address = unaligned_address.round_up_to_alignment(Self::Alignment);
+		let blocks_memory_inclusive_start_pointer = aligned_address + Self::offset_to_start_of_variable_length_memory();
+		let blocks_capacity = Self::blocks_capacity(number_of_blocks, block_size);
+		let blocks_memory_exclusive_end_pointer = blocks_memory_inclusive_start_pointer + blocks_capacity;
+		let blocks_meta_data_items_inclusive_start_pointer = blocks_memory_exclusive_end_pointer.round_up_to_alignment(Self::Alignment);
+		
+		let mut this = (aligned_address as *mut Self).to_non_null();
+		
+		this.mutable_reference().initialize(number_of_blocks, block_size, (blocks_memory_inclusive_start_pointer as *mut u8).to_non_null(), (blocks_memory_exclusive_end_pointer as *mut u8).to_non_null(), (blocks_meta_data_items_inclusive_start_pointer as *mut BlockMetaDataItems).to_non_null());
+		
+		this
+	}
+	
+	#[inline(always)]
+	fn initialize(&mut self, number_of_blocks: usize, block_size: BlockSize, blocks_memory_inclusive_start_pointer: NonNull<u8>, blocks_memory_exclusive_end_pointer: NonNull<u8>, blocks_meta_data_items_inclusive_start_pointer: NonNull<BlockMetaDataItems>)
+	{
+		let blocks_capacity = Self::blocks_capacity(number_of_blocks, block_size);
 		
 		unsafe
 		{
-			write(&mut self.reference_counter, Self::new_reference_counter());
+			write(&mut self.number_of_blocks, number_of_blocks);
 			write(&mut self.block_size, block_size);
-			write(&mut self.memory_base_pointer, memory_base_pointer);
-			write(&mut self.exclusive_end_address, memory_base_pointer.offset(capacity));
-			write(&mut self.cto_pool_arc, cto_pool_arc.clone());
+			write(&mut self.blocks_memory_inclusive_start_pointer, blocks_memory_inclusive_start_pointer);
+			write(&mut self.blocks_memory_exclusive_end_pointer, blocks_memory_exclusive_end_pointer);
+			write(&mut self.blocks_meta_data_items_inclusive_start_pointer, blocks_meta_data_items_inclusive_start_pointer);
 			write(&mut self.bags, Bags::default());
 			
-			self.block_meta_data_items.initialize(number_of_blocks);
+			self.block_meta_data_items_mut().initialize(number_of_blocks);
 			
 			self.initialize_chains(number_of_blocks);
 		}
@@ -97,7 +141,7 @@ impl<B: Block> BlockAllocator<B>
 	/// For a block size of 64, this means the maximum allocation is 64kb; for a 512 byte block size, it is 512Kb.
 	/// A request for a zero-size (empty) allocation, ie `requested_size == 0`, will result in a null pointer, `BlockPointer::Null`.
 	/// Second result argument is `chain_length`, ie the number of blocks in the allocation.
-	pub fn allocate_chain(&self, requested_size: usize) -> (BlockPointer<B>, usize)
+	pub fn allocate_chain(&self, requested_size: usize) -> (BlockPointer, usize)
 	{
 		let number_of_blocks_required = self.block_size.number_of_blocks_required(requested_size);
 		
@@ -105,15 +149,10 @@ impl<B: Block> BlockAllocator<B>
 	}
 	
 	/// Allocate chains
-	pub fn allocate_chains(block_allocator: &CtoStrongArc<Self>, requested_size: usize) -> Result<NonNull<Chains<B>>, ()>
+	pub fn allocate_chains(&self, requested_size: usize, cto_pool_arc: &CtoPoolArc) -> Result<NonNull<Chains>, ()>
 	{
-		let chains = Chains::new(block_allocator)?;
-		block_allocator.allocate_chains_internal(requested_size, chains)
-	}
-	
-	#[inline(always)]
-	fn allocate_chains_internal(&self, requested_size: usize, mut chains: NonNull<Chains<B>>) -> Result<NonNull<Chains<B>>, ()>
-	{
+		let mut chains = Chains::new(self, cto_pool_arc)?;
+		
 		let number_of_blocks_required = self.block_size.number_of_blocks_required(requested_size);
 		if number_of_blocks_required == 0
 		{
@@ -130,7 +169,7 @@ impl<B: Block> BlockAllocator<B>
 			unsafe { drop_in_place(chains.as_ptr()) };
 			return Err(())
 		}
-		unsafe { chains.as_mut().head_of_chains_linked_list = head_of_chains_linked_list };
+		chains.mutable_reference().head_of_chains_linked_list = head_of_chains_linked_list;
 		
 		let mut previous_chain = head_of_chains_linked_list;
 		number_of_blocks_remaining_to_find -= chain_length;
@@ -160,9 +199,15 @@ impl<B: Block> BlockAllocator<B>
 	}
 	
 	#[inline(always)]
-	fn block_meta_data_unchecked(&self, block_pointer: BlockPointer<B>) -> &BlockMetaData<B>
+	pub(crate) fn to_non_null(&self) -> NonNull<Self>
 	{
-		block_pointer.expand_to_pointer_to_meta_data_unchecked(&self.block_meta_data_items)
+		(self as *const Self as *mut Self).to_non_null()
+	}
+	
+	#[inline(always)]
+	fn block_meta_data_unchecked(&self, block_pointer: BlockPointer) -> &BlockMetaData
+	{
+		block_pointer.expand_to_pointer_to_meta_data_unchecked(self.block_meta_data_items())
 	}
 	
 	fn initialize_chains(&mut self, number_of_blocks: usize)
@@ -177,7 +222,7 @@ impl<B: Block> BlockAllocator<B>
 			let block_index = chain_index * InclusiveMaximumChainLength;
 			let add_block = BlockPointer::new(block_index as u32);
 			
-			self.bags.add(&self.block_meta_data_items, maximum_chain_length, add_block);
+			self.bags.add(self.block_meta_data_items(), maximum_chain_length, add_block);
 			
 			chain_index += 1;
 		}
@@ -188,12 +233,12 @@ impl<B: Block> BlockAllocator<B>
 			let block_index = number_of_blocks - odd_length_chain;
 			let add_block = BlockPointer::new(block_index as u32);
 			
-			self.bags.add(&self.block_meta_data_items, ChainLength::from_length(odd_length_chain), add_block);
+			self.bags.add(self.block_meta_data_items(), ChainLength::from_length(odd_length_chain), add_block);
 		}
 	}
 	
 	#[inline(always)]
-	pub(crate) fn receive_solitary_chain_back(&self, solitary_chain_block_pointer: BlockPointer<B>)
+	pub(crate) fn receive_solitary_chain_back(&self, solitary_chain_block_pointer: BlockPointer)
 	{
 		debug_assert!(solitary_chain_block_pointer.is_not_null(), "solitary_chain_block_pointer should not be null");
 		let solitary_chain_block_meta_data = self.block_meta_data_unchecked(solitary_chain_block_pointer);
@@ -203,15 +248,15 @@ impl<B: Block> BlockAllocator<B>
 		let mut solitary_chain_length = solitary_chain_block_meta_data.chain_length();
 		while solitary_chain_length.is_less_than_inclusive_maximum()
 		{
-			let subsequent_chain_start_address = solitary_chain_block_pointer.subsequent_chain_start_address(self.memory_base_pointer, solitary_chain_length);
+			let subsequent_chain_start_address = solitary_chain_block_pointer.subsequent_chain_start_address(self.blocks_memory_inclusive_start_pointer, solitary_chain_length, self.block_size);
 			
-			if subsequent_chain_start_address.as_ptr() == self.exclusive_end_address.as_ptr()
+			if subsequent_chain_start_address.as_ptr() == self.blocks_memory_exclusive_end_pointer.as_ptr()
 			{
 				break
 			}
 			
-			let cut_chain_block_pointer = BlockPointer::block_address_to_block_pointer(self.memory_base_pointer, subsequent_chain_start_address);
-			if self.bags.try_to_cut(&self.block_meta_data_items, cut_chain_block_pointer)
+			let cut_chain_block_pointer = BlockPointer::block_address_to_block_pointer(self.blocks_memory_inclusive_start_pointer, subsequent_chain_start_address, self.block_size);
+			if self.bags.try_to_cut(self.block_meta_data_items(), cut_chain_block_pointer)
 			{
 				let cut_chain_block_meta_data = self.block_meta_data_unchecked(cut_chain_block_pointer);
 				
@@ -223,7 +268,7 @@ impl<B: Block> BlockAllocator<B>
 					None =>
 					{
 						cut_chain_block_meta_data.reset_before_add_to_bag();
-						self.bags.add(&self.block_meta_data_items, cut_chain_length, cut_chain_block_pointer);
+						self.bags.add(self.block_meta_data_items(), cut_chain_length, cut_chain_block_pointer);
 						break
 					},
 					
@@ -243,14 +288,14 @@ impl<B: Block> BlockAllocator<B>
 	}
 	
 	#[inline(always)]
-	fn nothing_to_merge_with_so_add_to_free_list(&self, solitary_chain_block_pointer: BlockPointer<B>, solitary_chain_block_meta_data: &BlockMetaData<B>, solitary_chain_length: ChainLength)
+	fn nothing_to_merge_with_so_add_to_free_list(&self, solitary_chain_block_pointer: BlockPointer, solitary_chain_block_meta_data: &BlockMetaData, solitary_chain_length: ChainLength)
 	{
 		solitary_chain_block_meta_data.reset_before_add_to_bag();
-		self.bags.add(&self.block_meta_data_items, solitary_chain_length, solitary_chain_block_pointer)
+		self.bags.add(self.block_meta_data_items(), solitary_chain_length, solitary_chain_block_pointer)
 	}
 	
 	#[inline(always)]
-	fn grab_a_chain(&self, ideal_number_of_blocks: usize) -> (BlockPointer<B>, usize)
+	fn grab_a_chain(&self, ideal_number_of_blocks: usize) -> (BlockPointer, usize)
 	{
 		let capped_chain_length = min(ideal_number_of_blocks, InclusiveMaximumChainLength);
 		
@@ -260,12 +305,12 @@ impl<B: Block> BlockAllocator<B>
 		while search_for_chain_length <= InclusiveMaximumChainLength
 		{
 			let our_shorter_chain_length = ChainLength::from_length(search_for_chain_length);
-			let chain = self.bags.remove(&self.block_meta_data_items, our_shorter_chain_length);
+			let chain = self.bags.remove(self.block_meta_data_items(), our_shorter_chain_length);
 			if chain.is_not_null()
 			{
 				if search_for_chain_length != capped_chain_length
 				{
-					chain.expand_to_pointer_to_meta_data_unchecked(&self.block_meta_data_items).snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(chain, self.memory_base_pointer, our_shorter_chain_length, self);
+					chain.expand_to_pointer_to_meta_data_unchecked(self.block_meta_data_items()).snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(chain, self.blocks_memory_inclusive_start_pointer, our_shorter_chain_length, self);
 				}
 				return (chain, search_for_chain_length)
 			}
@@ -277,7 +322,7 @@ impl<B: Block> BlockAllocator<B>
 		let mut search_for_chain_length = capped_chain_length;
 		while search_for_chain_length > 0
 		{
-			let chain = self.bags.remove(&self.block_meta_data_items, ChainLength::from_length(search_for_chain_length));
+			let chain = self.bags.remove(self.block_meta_data_items(), ChainLength::from_length(search_for_chain_length));
 			if chain.is_not_null()
 			{
 				return (chain, search_for_chain_length)
@@ -290,7 +335,7 @@ impl<B: Block> BlockAllocator<B>
 	}
 	
 	#[inline(always)]
-	fn grab_a_chain_exactly_for(&self, number_of_blocks: usize) -> (BlockPointer<B>, usize)
+	fn grab_a_chain_exactly_for(&self, number_of_blocks: usize) -> (BlockPointer, usize)
 	{
 		if number_of_blocks == 0 || number_of_blocks > InclusiveMaximumChainLength
 		{
@@ -303,12 +348,12 @@ impl<B: Block> BlockAllocator<B>
 		while search_for_chain_length <= InclusiveMaximumChainLength
 		{
 			let our_shorter_chain_length = ChainLength::from_length(search_for_chain_length);
-			let chain = self.bags.remove(&self.block_meta_data_items, our_shorter_chain_length);
+			let chain = self.bags.remove(self.block_meta_data_items(), our_shorter_chain_length);
 			if chain.is_not_null()
 			{
 				if search_for_chain_length != number_of_blocks
 				{
-					chain.expand_to_pointer_to_meta_data_unchecked(&self.block_meta_data_items).snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(chain, self.memory_base_pointer, our_shorter_chain_length, self);
+					chain.expand_to_pointer_to_meta_data_unchecked(self.block_meta_data_items()).snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(chain, self.blocks_memory_inclusive_start_pointer, our_shorter_chain_length, self);
 				}
 				return (chain, search_for_chain_length)
 			}

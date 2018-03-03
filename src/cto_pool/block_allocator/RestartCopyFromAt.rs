@@ -4,24 +4,25 @@
 
 /// Stored in Volatile Memory
 #[derive(Debug)]
-pub struct RestartCopyFromAt<'block_meta_data, B: 'block_meta_data + Block>
+pub struct RestartCopyFromAt<'block_meta_data>
 {
-	chain: Chain<B>,
+	chain: Chain,
 	offset: usize,
-	block_meta_data_items: &'block_meta_data BlockMetaDataItems<B>,
+	block_meta_data_items: &'block_meta_data BlockMetaDataItems,
 }
 
-impl<'block_meta_data, B: 'block_meta_data + Block> RestartCopyFromAt<'block_meta_data, B>
+impl<'block_meta_data> RestartCopyFromAt<'block_meta_data>
 {
 	/// head_of_chains_linked_list can be null; any copy must then only be for zero bytes.
 	#[inline(always)]
-	fn new(memory_base_pointer: NonNull<u8>, head_of_chains_linked_list: BlockPointer<B>, block_meta_data_items: &'block_meta_data BlockMetaDataItems<B>) -> Self
+	fn new(block_size: BlockSize, blocks_memory_inclusive_start_pointer: NonNull<u8>, head_of_chains_linked_list: BlockPointer, block_meta_data_items: &'block_meta_data BlockMetaDataItems) -> Self
 	{
 		Self
 		{
 			chain: Chain
 			{
-				memory_base_pointer,
+				block_size,
+				blocks_memory_inclusive_start_pointer,
 				block_pointer: head_of_chains_linked_list,
 				block_meta_data: head_of_chains_linked_list.expand_to_pointer_to_meta_data_raw(block_meta_data_items),
 			},

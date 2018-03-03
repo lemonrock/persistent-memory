@@ -3,14 +3,14 @@
 
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub(crate) struct BlockMetaDataItems<B: Block>(PhantomData<B>);
+pub(crate) struct BlockMetaDataItems();
 
-impl<B: Block> BlockMetaDataItems<B>
+impl BlockMetaDataItems
 {
 	#[inline(always)]
 	fn size_of(number_of_blocks: usize) -> usize
 	{
-		number_of_blocks * size_of::<BlockMetaData<B>>()
+		number_of_blocks * size_of::<BlockMetaData>()
 	}
 	
 	#[inline(always)]
@@ -29,20 +29,20 @@ impl<B: Block> BlockMetaDataItems<B>
 	}
 	
 	#[inline(always)]
-	fn get_unchecked(&self, block_pointer: usize) -> &BlockMetaData<B>
+	fn get_unchecked(&self, block_pointer: usize) -> &BlockMetaData
 	{
 		unsafe { self.get(block_pointer) }.longer_as_ref()
 	}
 	
 	#[inline(always)]
-	fn get_unchecked_raw(&self, block_pointer: usize) -> NonNull<BlockMetaData<B>>
+	fn get_unchecked_raw(&self, block_pointer: usize) -> NonNull<BlockMetaData>
 	{
 		unsafe { self.get(block_pointer) }
 	}
 	
 	#[inline(always)]
-	unsafe fn get(&self, block_pointer: usize) -> NonNull<BlockMetaData<B>>
+	unsafe fn get(&self, block_pointer: usize) -> NonNull<BlockMetaData>
 	{
-		NonNull::new_unchecked(self as *const Self as *const u8 as *mut u8 as *mut BlockMetaData<B>).offset(block_pointer)
+		NonNull::new_unchecked(self as *const Self as *const u8 as *mut u8 as *mut BlockMetaData).offset(block_pointer)
 	}
 }

@@ -4,13 +4,13 @@
 
 // Effectively operates like a stack.
 #[derive(Debug)]
-pub(crate) struct BagStripe<B: Block>
+pub(crate) struct BagStripe
 {
-	head: AtomicBlockPointer<B>,
+	head: AtomicBlockPointer,
 	spin_lock: BestSpinLockForCompilationTarget,
 }
 
-impl<B: Block> Default for BagStripe<B>
+impl Default for BagStripe
 {
 	#[inline(always)]
 	fn default() -> Self
@@ -23,7 +23,7 @@ impl<B: Block> Default for BagStripe<B>
 	}
 }
 
-impl<B: Block> CtoSafe for BagStripe<B>
+impl CtoSafe for BagStripe
 {
 	#[inline(always)]
 	fn cto_pool_opened(&mut self, _cto_pool_arc: &CtoPoolArc)
@@ -32,10 +32,10 @@ impl<B: Block> CtoSafe for BagStripe<B>
 	}
 }
 
-impl<B: Block> BagStripe<B>
+impl BagStripe
 {
 	#[inline(always)]
-	fn add(&self, chain_length: ChainLength, add_block: BlockPointer<B>, block_meta_data_items: &BlockMetaDataItems<B>, add_block_meta_data: &BlockMetaData<B>, next_bag_stripe_index: BagStripeIndex)
+	fn add(&self, chain_length: ChainLength, add_block: BlockPointer, block_meta_data_items: &BlockMetaDataItems, add_block_meta_data: &BlockMetaData, next_bag_stripe_index: BagStripeIndex)
 	{
 		debug_assert!(add_block.is_not_null(), "add_block can not be null");
 		debug_assert!(add_block_meta_data.get_next().is_null(), "add_block `next` can not be non-null");
@@ -64,7 +64,7 @@ impl<B: Block> BagStripe<B>
 	}
 	
 	#[inline(always)]
-	fn remove(&self, chain_length: ChainLength, block_meta_data_items: &BlockMetaDataItems<B>) -> BlockPointer<B>
+	fn remove(&self, chain_length: ChainLength, block_meta_data_items: &BlockMetaDataItems) -> BlockPointer
 	{
 		if !self.try_to_acquire_spin_lock()
 		{
@@ -98,7 +98,7 @@ impl<B: Block> BagStripe<B>
 	}
 	
 	#[inline(always)]
-	fn try_to_cut(&self, chain_length: ChainLength, cut_block: BlockPointer<B>, cut_block_meta_data: &BlockMetaData<B>, block_meta_data_items: &BlockMetaDataItems<B>) -> bool
+	fn try_to_cut(&self, chain_length: ChainLength, cut_block: BlockPointer, cut_block_meta_data: &BlockMetaData, block_meta_data_items: &BlockMetaDataItems) -> bool
 	{
 		if !self.try_to_acquire_spin_lock()
 		{
@@ -147,14 +147,14 @@ impl<B: Block> BagStripe<B>
 	
 	#[doc(hidden)]
 	#[inline(always)]
-	fn get_head_relaxed(&self) -> BlockPointer<B>
+	fn get_head_relaxed(&self) -> BlockPointer
 	{
 		self.head.get_relaxed()
 	}
 	
 	#[doc(hidden)]
 	#[inline(always)]
-	fn set_head_relaxed(&self, new_head: BlockPointer<B>)
+	fn set_head_relaxed(&self, new_head: BlockPointer)
 	{
 		self.head.set_relaxed(new_head)
 	}

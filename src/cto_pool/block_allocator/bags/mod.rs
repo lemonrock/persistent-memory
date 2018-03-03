@@ -6,7 +6,6 @@ use super::flush_struct;
 use super::super::CtoPoolArc;
 use super::super::CtoSafe;
 use super::AtomicBlockPointer;
-use super::Block;
 use super::BlockMetaData;
 use super::BlockMetaDataItems;
 use super::BlockPointer;

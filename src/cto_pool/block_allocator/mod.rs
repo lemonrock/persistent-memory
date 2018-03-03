@@ -2,14 +2,14 @@
 // Copyright © 2017 The developers of nvml. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/lemonrock/nvml/master/COPYRIGHT.
 
 
+use Alignment;
 use ExtendedNonNull;
+use ToNonNull;
 use super::*;
-use super::arc::CtoStrongArc;
-use super::arc::CtoStrongArcInner;
 use self::bags::*;
 use ::libc::c_void;
 use ::std::cell::Cell;
-use ::std::marker::PhantomData;
+use ::std::cmp::min;
 use ::std::mem::size_of;
 use ::std::ptr::copy_nonoverlapping;
 use ::std::ptr::drop_in_place;
@@ -23,7 +23,6 @@ mod bags;
 
 
 include!("AtomicBlockPointer.rs");
-include!("Block.rs");
 include!("BlockAllocator.rs");
 include!("BlockMetaData.rs");
 include!("BlockMetaDataItems.rs");
@@ -33,7 +32,6 @@ include!("Chain.rs");
 include!("ChainLength.rs");
 include!("Chains.rs");
 include!("NonNullExt.rs");
-include!("PowerOfTwo.rs");
 include!("RestartCopyFromAt.rs");
 include!("RestartCopyIntoAt.rs");
 

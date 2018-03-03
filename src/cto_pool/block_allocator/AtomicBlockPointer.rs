@@ -3,40 +3,40 @@
 
 
 #[derive(Debug)]
-struct AtomicBlockPointer<B: Block>(AtomicU32, PhantomData<B>);
+struct AtomicBlockPointer(AtomicU32);
 
-impl<B: Block> Default for AtomicBlockPointer<B>
+impl Default for AtomicBlockPointer
 {
 	#[inline(always)]
 	fn default() -> Self
 	{
 		let block_pointer = BlockPointer::default();
-		AtomicBlockPointer(AtomicU32::new(block_pointer.0), block_pointer.1)
+		AtomicBlockPointer(AtomicU32::new(block_pointer.0))
 	}
 }
 
-impl<B: Block> AtomicBlockPointer<B>
+impl AtomicBlockPointer
 {
 	#[inline(always)]
-	fn get_relaxed(&self) -> BlockPointer<B>
+	fn get_relaxed(&self) -> BlockPointer
 	{
 		BlockPointer::new(self.0.load(Relaxed))
 	}
 	
 	#[inline(always)]
-	fn set_relaxed(&self, new_block_pointer: BlockPointer<B>)
+	fn set_relaxed(&self, new_block_pointer: BlockPointer)
 	{
 		self.0.store(new_block_pointer.0, Relaxed)
 	}
 	
 	#[inline(always)]
-	fn get(&self) -> BlockPointer<B>
+	fn get(&self) -> BlockPointer
 	{
 		BlockPointer::new(self.0.load(Acquire))
 	}
 	
 	#[inline(always)]
-	fn set(&self, new_block_pointer: BlockPointer<B>)
+	fn set(&self, new_block_pointer: BlockPointer)
 	{
 		self.0.store(new_block_pointer.0, Release)
 	}

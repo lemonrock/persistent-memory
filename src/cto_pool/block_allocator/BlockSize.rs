@@ -19,6 +19,9 @@ pub enum BlockSize
 	
 	/// Choose this for systems with AVX-512 instructions.
 	_512 = 512,
+
+	/// Do not use this ordinarily
+	_4096 = 4096,
 }
 
 impl Default for BlockSize

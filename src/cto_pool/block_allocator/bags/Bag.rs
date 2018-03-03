@@ -3,14 +3,14 @@
 
 
 #[derive(Debug)]
-pub(crate) struct Bag<B: Block>
+pub(crate) struct Bag
 {
 	bag_stripe_index_counter: BagStripeIndexCounter,
 	removal_counter: RemovalCounter,
-	bag_stripe_array: [BagStripe<B>; BagStripeArrayLength],
+	bag_stripe_array: [BagStripe; BagStripeArrayLength],
 }
 
-impl<B: Block> Default for Bag<B>
+impl Default for Bag
 {
 	#[inline(always)]
 	fn default() -> Self
@@ -21,7 +21,7 @@ impl<B: Block> Default for Bag<B>
 			removal_counter: RemovalCounter::default(),
 			bag_stripe_array:
 			{
-				let mut array: [BagStripe<B>; BagStripeArrayLength] = unsafe { uninitialized() };
+				let mut array: [BagStripe; BagStripeArrayLength] = unsafe { uninitialized() };
 				
 				for uninitialized_bag_stripe in array.iter_mut()
 				{
@@ -34,7 +34,7 @@ impl<B: Block> Default for Bag<B>
 	}
 }
 
-impl<B: Block> CtoSafe for Bag<B>
+impl CtoSafe for Bag
 {
 	#[inline(always)]
 	fn cto_pool_opened(&mut self, cto_pool_arc: &CtoPoolArc)
@@ -46,11 +46,11 @@ impl<B: Block> CtoSafe for Bag<B>
 	}
 }
 
-impl<B: Block> Bag<B>
+impl Bag
 {
 	// add tries to ensure a round-robin, uniform distribution amongst stripes.
 	#[inline(always)]
-	pub(crate) fn add(&self, chain_length: ChainLength, add_block: BlockPointer<B>, block_meta_data_items: &BlockMetaDataItems<B>)
+	pub(crate) fn add(&self, chain_length: ChainLength, add_block: BlockPointer, block_meta_data_items: &BlockMetaDataItems)
 	{
 		debug_assert!(add_block.is_not_null(), "add_block can not be null");
 		
@@ -68,7 +68,7 @@ impl<B: Block> Bag<B>
 	
 	// remove tries to ensure a round-robin, uniform distribution amongst stripes by always trying to remove from the oldest added to stripe.
 	#[inline(always)]
-	pub(crate) fn remove(&self, chain_length: ChainLength, block_meta_data_items: &BlockMetaDataItems<B>) -> BlockPointer<B>
+	pub(crate) fn remove(&self, chain_length: ChainLength, block_meta_data_items: &BlockMetaDataItems) -> BlockPointer
 	{
 		let mut added_count = self.number_of_blocks_added_over_all_time();
 		let mut removed_count = self.number_of_blocks_removed_over_all_time();
@@ -115,7 +115,7 @@ impl<B: Block> Bag<B>
 	}
 	
 	#[inline(always)]
-	pub(crate) fn try_to_cut(&self, chain_length: ChainLength, probably_in_bag_block: BlockPointer<B>, probably_in_bag_block_meta_data: &BlockMetaData<B>, block_meta_data_items: &BlockMetaDataItems<B>, bag_stripe_index: BagStripeIndex) -> bool
+	pub(crate) fn try_to_cut(&self, chain_length: ChainLength, probably_in_bag_block: BlockPointer, probably_in_bag_block_meta_data: &BlockMetaData, block_meta_data_items: &BlockMetaDataItems, bag_stripe_index: BagStripeIndex) -> bool
 	{
 		let bag_stripe = bag_stripe_index.get_bag_stripe(&self.bag_stripe_array);
 		bag_stripe.try_to_cut(chain_length, probably_in_bag_block, probably_in_bag_block_meta_data, block_meta_data_items)

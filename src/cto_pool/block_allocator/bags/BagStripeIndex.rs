@@ -8,7 +8,7 @@ pub(crate) struct BagStripeIndex(u5);
 impl BagStripeIndex
 {
 	#[inline(always)]
-	pub(crate) fn get_bag_stripe<'bag_stripe, B: Block>(&self, bag_stripe_array: &'bag_stripe [BagStripe<B>; BagStripeArrayLength]) -> &'bag_stripe BagStripe<B>
+	pub(crate) fn get_bag_stripe<'bag_stripe>(&self, bag_stripe_array: &'bag_stripe [BagStripe; BagStripeArrayLength]) -> &'bag_stripe BagStripe
 	{
 		unsafe { bag_stripe_array.get_unchecked(self.as_index()) }
 	}

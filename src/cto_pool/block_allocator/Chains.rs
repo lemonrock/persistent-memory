@@ -3,71 +3,92 @@
 
 
 /// Stored in Persistent Memory
-pub struct Chains<B: Block>
+pub struct Chains
 {
-	block_allocator: CtoStrongArc<BlockAllocator<B>>,
-	head_of_chains_linked_list: BlockPointer<B>,
+	cto_pool_arc: CtoPoolArc,
+	block_allocator: NonNull<BlockAllocator>,
+	head_of_chains_linked_list: BlockPointer,
 }
 
-impl<B: Block> Drop for Chains<B>
+impl Drop for Chains
 {
 	#[inline(always)]
 	fn drop(&mut self)
 	{
 		if self.head_of_chains_linked_list.is_not_null()
 		{
-			let head = self.block_allocator.block_meta_data_unchecked(self.head_of_chains_linked_list);
-			head.recycle_chains_into_block_allocator(self.block_allocator.as_ref(), self.head_of_chains_linked_list);
+			let block_allocator = self.block_allocator();
+			let head = block_allocator.block_meta_data_unchecked(self.head_of_chains_linked_list);
+			head.recycle_chains_into_block_allocator(block_allocator, self.head_of_chains_linked_list);
 		}
-		
-		let cto_pool_arc = self.block_allocator.cto_pool_arc.clone();
-		cto_pool_arc.free_pointer(self)
+		self.cto_pool_arc.clone().free_pointer(self)
 	}
 }
 
-impl<B: Block> CtoSafe for Chains<B>
+impl CtoSafe for Chains
 {
 	#[inline(always)]
 	fn cto_pool_opened(&mut self, cto_pool_arc: &CtoPoolArc)
 	{
-		self.block_allocator.cto_pool_opened(cto_pool_arc)
+		self.block_allocator_mut().cto_pool_opened(cto_pool_arc)
 	}
 }
 
-impl<B: Block> Chains<B>
+impl Chains
 {
 	#[inline(always)]
-	fn new(block_allocator: &CtoStrongArc<BlockAllocator<B>>) -> Result<NonNull<Self>, ()>
+	fn new(block_allocator: &BlockAllocator, cto_pool_arc: &CtoPoolArc) -> Result<NonNull<Self>, ()>
 	{
-		match block_allocator.cto_pool_arc.pool_pointer().aligned_alloc(size_of::<Self>(), size_of::<Self>())
+		match cto_pool_arc.pool_pointer().aligned_alloc(size_of::<Self>(), size_of::<Self>())
 		{
 			Err(_) => Err(()),
 			Ok(void_pointer) =>
 			{
-				let mut this = unsafe { NonNull::new_unchecked(void_pointer as *mut Self) };
+				let mut this = (void_pointer as *mut Self).to_non_null();
 				
-				unsafe
-				{
-					write(&mut this.as_mut().block_allocator, block_allocator.clone());
-					write(&mut this.as_mut().head_of_chains_linked_list, BlockPointer::Null);
-				}
+				this.mutable_reference().initialize(block_allocator.to_non_null(), cto_pool_arc);
 				
 				Ok(this)
 			}
 		}
 	}
 	
-	/// Stored in Volatile Memory
 	#[inline(always)]
-	pub fn copy_bytes_into_chains_start<'block_meta_data>(&'block_meta_data self) -> RestartCopyIntoAt<'block_meta_data, B>
+	fn initialize(&mut self, block_allocator: NonNull<BlockAllocator>, cto_pool_arc: &CtoPoolArc)
 	{
-		RestartCopyIntoAt::new(self.block_allocator.memory_base_pointer, self.head_of_chains_linked_list, &self.block_allocator.block_meta_data_items)
+		unsafe
+		{
+			write(&mut self.cto_pool_arc, cto_pool_arc.clone());
+			write(&mut self.block_allocator, block_allocator.clone());
+			write(&mut self.head_of_chains_linked_list, BlockPointer::Null);
+		}
 	}
 	
-	/// Stored in Volatile Memory
 	#[inline(always)]
-	pub fn copy_bytes_from_chains_start<'block_meta_data>(&'block_meta_data self) -> RestartCopyFromAt<'block_meta_data, B>
+	fn block_allocator(&self) -> &BlockAllocator
 	{
-		RestartCopyFromAt::new(self.block_allocator.memory_base_pointer, self.head_of_chains_linked_list, &self.block_allocator.block_meta_data_items)
+		self.block_allocator.reference()
+	}
+	
+	#[inline(always)]
+	fn block_allocator_mut(&mut self) -> &mut BlockAllocator
+	{
+		self.block_allocator.mutable_reference()
+	}
+	
+	/// Copy bytes into chains.
+	#[inline(always)]
+	pub fn copy_bytes_into_chains_start<'block_meta_data>(&'block_meta_data self) -> RestartCopyIntoAt<'block_meta_data>
+	{
+		let block_allocator = self.block_allocator();
+		RestartCopyIntoAt::new(block_allocator.block_size, block_allocator.blocks_memory_inclusive_start_pointer, self.head_of_chains_linked_list, &block_allocator.block_meta_data_items())
+	}
+	
+	/// Copy bytes from chains.
+	#[inline(always)]
+	pub fn copy_bytes_from_chains_start<'block_meta_data>(&'block_meta_data self) -> RestartCopyFromAt<'block_meta_data>
+	{
+		let block_allocator = self.block_allocator();
+		RestartCopyFromAt::new(block_allocator.block_size, block_allocator.blocks_memory_inclusive_start_pointer, self.head_of_chains_linked_list, &block_allocator.block_meta_data_items())
 	}
 }

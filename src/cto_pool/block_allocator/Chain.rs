@@ -4,17 +4,18 @@
 
 /// Stored in Volatile Memory
 #[derive(Debug)]
-pub(crate) struct Chain<B: Block>
+pub(crate) struct Chain
 {
-	memory_base_pointer: NonNull<u8>,
-	block_pointer: BlockPointer<B>,
-	block_meta_data: Option<NonNull<BlockMetaData<B>>>,
+	block_size: BlockSize,
+	blocks_memory_inclusive_start_pointer: NonNull<u8>,
+	block_pointer: BlockPointer,
+	block_meta_data: Option<NonNull<BlockMetaData>>,
 }
 
-impl<B: Block> Chain<B>
+impl Chain
 {
 	#[inline(always)]
-	pub(crate) fn next_chain(&mut self, block_meta_data_items: &BlockMetaDataItems<B>)
+	pub(crate) fn next_chain(&mut self, block_meta_data_items: &BlockMetaDataItems)
 	{
 		let next_chain = self.get_next_chain();
 		self.block_pointer = next_chain;
@@ -32,7 +33,7 @@ impl<B: Block> Chain<B>
 	#[inline(always)]
 	pub(crate) fn capacity(&self) -> usize
 	{
-		self.chain_length().as_capacity::<B>()
+		self.chain_length().as_capacity(self.block_size)
 	}
 	
 	#[inline(always)]
@@ -47,11 +48,11 @@ impl<B: Block> Chain<B>
 	#[inline(always)]
 	pub(crate) fn data_ptr(&self) -> NonNull<u8>
 	{
-		self.block_pointer.expand_to_pointer_to_memory_unchecked(self.memory_base_pointer)
+		self.block_pointer.expand_to_pointer_to_memory_unchecked(self.blocks_memory_inclusive_start_pointer, self.block_size)
 	}
 	
 	#[inline(always)]
-	fn get_next_chain(&self) -> BlockPointer<B>
+	fn get_next_chain(&self) -> BlockPointer
 	{
 		self.block_meta_data().get_next_chain()
 	}
@@ -63,7 +64,7 @@ impl<B: Block> Chain<B>
 	}
 	
 	#[inline(always)]
-	fn block_meta_data(&self) -> &BlockMetaData<B>
+	fn block_meta_data(&self) -> &BlockMetaData
 	{
 		let block_meta_data = self.block_meta_data.expect("No block meta data implies a null BlockPointer for this chain, which means we've exceeded the available memory");
 		block_meta_data.longer_as_ref()
