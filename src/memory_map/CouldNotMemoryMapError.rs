@@ -4,7 +4,7 @@
 
 quick_error!
 {
-	/// Reason for failing to memory map.
+	/// Could not memory map error.
 	#[derive(Debug)]
 	pub enum CouldNotMemoryMapError
 	{
@@ -17,48 +17,32 @@ quick_error!
             from()
 		}
 		
-		/// Could not obtain a DAX device statistic.
-		CouldNotObtainDaxDeviceStatistic(cause: CouldNotObtainDaxDeviceStatisticError)
+		/// Could not parse the occupied memory map.
+		CouldNotParseOccupiedMemoryMap(cause: OccupiedMemoryMapParseError)
 		{
 			cause(cause)
 			description(cause.description())
-            display("Could not memory map because of DAX device error: {}", cause)
-            from()
+			display("Could not memory map because of occupied memory map parse error: {}", cause)
+			from()
 		}
 		
 		/// Could not find a contiguous region to memory into
 		CouldNotFindAContiguousRegionToMemoryMapInto(size: u64, alignment: usize)
 		{
 			description("could not find a contiguous region to memory map into")
-            display("Could not memory map because could not find a contiguous region to memory map into for size '{}' and alignment '{}'", size, alignment)
+			display("Could not memory map because could not find a contiguous region to memory map into for size '{}' and alignment '{}'", size, alignment)
 		}
 		
-		/// Could not parse a line in the `/proc` map file for this process.
-		CouldNotParseProcMap(cause: ::text_io::Error)
+		/// Could not obtain a DAX device statistic.
+		CouldNotObtainDaxDeviceStatistic(cause: CouldNotObtainDaxDeviceStatisticError)
 		{
 			cause(cause)
 			description(cause.description())
-            display("Could not memory map because could not parse proc map: {}", cause)
-            from()
+			display("Could not memory map because of DAX device error: {}", cause)
+			from()
 		}
 		
-		/// Could not convert a value in a line in the `/proc` map file for this process.
-		CouldNotConvertProcMapValue(cause: ::std::num::ParseIntError)
-		{
-			cause(cause)
-			description(cause.description())
-            display("Could not memory map because could not convert value from proc map: {}", cause)
-            from()
-		}
-		
-		/// Invalid line in the `/proc` map file for this process.
-		InvalidLineInProcMap(description: &'static str)
-		{
-			description(description)
-            display("Could not memory map because proc map has an invalid line '{}'", description)
-		}
-		
-		/// The `mmap` libc called failed.
+		/// The `mmap` libc call failed.
 		MMapFailed
 		{
 			description("mmap failed")

@@ -62,28 +62,33 @@ impl<B: Block> BlockAllocator<B>
 		let maximum_block_pointer_index = number_of_blocks - 1;
 		assert!(maximum_block_pointer_index < BlockPointer::<B>::ExclusiveMaximumBlockPointer, "maximum_block_pointer_index must be less than ExclusiveMaximumBlockPointer '{}'", BlockPointer::<B>::ExclusiveMaximumBlockPointer);
 		
+		let mut this: NonNull<Self> = cto_pool_arc.aligned_allocate_or_panic_of_type(8, size_of::<Self>() + BlockMetaDataItems::<B>::size_of(number_of_blocks));
+		
+		this.mutable_reference().initialize(number_of_blocks, block_size, cto_pool_arc);
+		
+		CtoStrongArc::new(this)
+	}
+	
+	#[inline(always)]
+	fn initialize(&mut self, number_of_blocks: usize, block_size: BlockSize, cto_pool_arc: &CtoPoolArc)
+	{
 		let capacity = block_size.total_memory_required_in_bytes(number_of_blocks);
 		
 		let memory_base_pointer = cto_pool_arc.aligned_allocate_or_panic(block_size.as_usize(), capacity);
 		
-		let mut this: NonNull<Self> = cto_pool_arc.aligned_allocate_or_panic_of_type(8, size_of::<Self>() + BlockMetaDataItems::<B>::size_of(number_of_blocks));
-		
 		unsafe
 		{
-			let this = this.as_mut();
-			write(&mut this.reference_counter, Self::new_reference_counter());
-			write(&mut this.block_size, block_size);
-			write(&mut this.memory_base_pointer, memory_base_pointer);
-			write(&mut this.exclusive_end_address, memory_base_pointer.offset(capacity));
-			write(&mut this.cto_pool_arc, cto_pool_arc.clone());
-			write(&mut this.bags, Bags::default());
+			write(&mut self.reference_counter, Self::new_reference_counter());
+			write(&mut self.block_size, block_size);
+			write(&mut self.memory_base_pointer, memory_base_pointer);
+			write(&mut self.exclusive_end_address, memory_base_pointer.offset(capacity));
+			write(&mut self.cto_pool_arc, cto_pool_arc.clone());
+			write(&mut self.bags, Bags::default());
 			
-			this.block_meta_data_items.initialize(number_of_blocks);
+			self.block_meta_data_items.initialize(number_of_blocks);
 			
-			this.initialize_chains(number_of_blocks);
+			self.initialize_chains(number_of_blocks);
 		}
-		
-		CtoStrongArc::new(this)
 	}
 	
 	/// Allocate

@@ -4,9 +4,10 @@
 
 /// Returns `Ok(Some(address))` if a suitably aligned unoccupied address could be found.
 /// Returns `Ok(None)` if no unoccupied address could be found.
+/// Usage of this method with `mmap` is not thread-safe - nothing prevents `mmap` (on Linux, and on FreeBSD without `MAP_EXCL`) from stamping on an existing mapping.
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 #[inline(always)]
-pub fn find_lowest_unoccupied_address_in_process_map(minimum_address_hint: *mut u8, size: usize, alignment: usize) -> Result<Option<*mut u8>, CouldNotMemoryMapError>
+pub fn find_lowest_unoccupied_address_in_process_map(minimum_address: *mut u8, size: usize, alignment: usize) -> Result<Option<*mut u8>, OccupiedMemoryMapParseError>
 {
 	debug_assert!(alignment.is_power_of_two(), "alignment must be a power of two");
 	
@@ -14,17 +15,17 @@ pub fn find_lowest_unoccupied_address_in_process_map(minimum_address_hint: *mut 
 	
 	let stack_starts_at = match occupied_memory_ranges.iter().next_back()
 	{
-		None => return Err(CouldNotMemoryMapError::InvalidLineInProcMap("There is no [stack] line")),
+		None => return Err(OccupiedMemoryMapParseError::InvalidLineInProcMap("There is no [stack] line")),
 		Some((stack_starts_at, _stack_ends_at)) => *stack_starts_at,
 	};
 	
-	let mut try_unaligned_allocation_starting_from = if minimum_address_hint.is_null()
+	let mut try_unaligned_allocation_starting_from = if minimum_address.is_null()
 	{
 		memory_map_page_size()
 	}
 	else
 	{
-		minimum_address_hint as usize
+		minimum_address as usize
 	};
 	
 	loop
@@ -61,7 +62,7 @@ pub fn find_lowest_unoccupied_address_in_process_map(minimum_address_hint: *mut 
 
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 #[inline(always)]
-fn occupied_memory_ranges() -> Result<BTreeMap<usize, usize>, CouldNotMemoryMapError>
+fn occupied_memory_ranges() -> Result<BTreeMap<usize, usize>, OccupiedMemoryMapParseError>
 {
 	// Whilst it seems that CurrentProcessMapFile is sorted and has no overlapping entries, experience of Linux kernel /proc and /sys suggests that documentation is poor and breaking change high.
 	let mut occupied_memory_ranges = BTreeMap::new();
@@ -69,14 +70,14 @@ fn occupied_memory_ranges() -> Result<BTreeMap<usize, usize>, CouldNotMemoryMapE
 	{
 		if occupied_memory_ranges.range(low .. high).count() != 0
 		{
-			return Err(CouldNotMemoryMapError::InvalidLineInProcMap("low .. high already present"))
+			return Err(OccupiedMemoryMapParseError::InvalidLineInProcMap("low .. high already present"))
 		}
 		
 		if let Some((_previous_low, previous_high)) = occupied_memory_ranges.range( .. low).next_back()
 		{
 			if *previous_high > low
 			{
-				return Err(CouldNotMemoryMapError::InvalidLineInProcMap("low .. high overlaps"))
+				return Err(OccupiedMemoryMapParseError::InvalidLineInProcMap("low .. high overlaps"))
 			}
 		}
 		
@@ -90,7 +91,7 @@ fn occupied_memory_ranges() -> Result<BTreeMap<usize, usize>, CouldNotMemoryMapE
 
 #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
 #[inline(always)]
-fn parse_current_process_map_file<MappedMemoryRangeUser: FnMut(usize, usize) -> Result<(), CouldNotMemoryMapError>>(mut mapped_memory_range_user: MappedMemoryRangeUser) -> Result<(), CouldNotMemoryMapError>
+fn parse_current_process_map_file<MappedMemoryRangeUser: FnMut(usize, usize) -> Result<(), OccupiedMemoryMapParseError>>(mut mapped_memory_range_user: MappedMemoryRangeUser) -> Result<(), OccupiedMemoryMapParseError>
 {
 	#[cfg(any(target_os = "android", target_os = "linux"))] const CurrentProcessMapFile: &'static str = "/proc/self/maps";
 	//noinspection SpellCheckingInspection
@@ -118,7 +119,7 @@ fn parse_current_process_map_file<MappedMemoryRangeUser: FnMut(usize, usize) -> 
 			// It might be possible for low == high for a zero-length mapping.
 			if low > high
 			{
-				return Err(CouldNotMemoryMapError::InvalidLineInProcMap("low is greater than high"))
+				return Err(OccupiedMemoryMapParseError::InvalidLineInProcMap("low is greater than high"))
 			}
 			
 			mapped_memory_range_user(low, high)?
