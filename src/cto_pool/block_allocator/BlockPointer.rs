@@ -4,7 +4,7 @@
 
 /// A compressed pointer, representing an index.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub(crate) struct BlockPointer<B: Block>(u32, PhantomData<B>);
+pub struct BlockPointer<B: Block>(u32, PhantomData<B>);
 
 impl<B: Block> Default for BlockPointer<B>
 {

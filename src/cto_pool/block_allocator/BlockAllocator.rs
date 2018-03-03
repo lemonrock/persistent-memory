@@ -91,15 +91,28 @@ impl<B: Block> BlockAllocator<B>
 		}
 	}
 	
-	/// Allocate
-	pub fn allocate(block_allocator: &CtoStrongArc<Self>, requested_size: usize) -> Result<NonNull<Chains<B>>, ()>
+	/// Allocate a chain.
+	/// Effectively like `malloc`, but alignment will always be `BlockSize` and `requested_size` will be rounded up to BlockSize.
+	/// A request for an allocation larger than `InclusiveMaximumChainLength` (usually 1024 blocks) will result in a null pointer, `BlockPointer::Null`.
+	/// For a block size of 64, this means the maximum allocation is 64kb; for a 512 byte block size, it is 512Kb.
+	/// A request for a zero-size (empty) allocation, ie `requested_size == 0`, will result in a null pointer, `BlockPointer::Null`.
+	/// Second result argument is `chain_length`, ie the number of blocks in the allocation.
+	pub fn allocate_chain(&self, requested_size: usize) -> (BlockPointer<B>, usize)
+	{
+		let number_of_blocks_required = self.block_size.number_of_blocks_required(requested_size);
+		
+		self.grab_a_chain_exactly_for(number_of_blocks_required)
+	}
+	
+	/// Allocate chains
+	pub fn allocate_chains(block_allocator: &CtoStrongArc<Self>, requested_size: usize) -> Result<NonNull<Chains<B>>, ()>
 	{
 		let chains = Chains::new(block_allocator)?;
-		block_allocator.allocate_internal(requested_size, chains)
+		block_allocator.allocate_chains_internal(requested_size, chains)
 	}
 	
 	#[inline(always)]
-	fn allocate_internal(&self, requested_size: usize, mut chains: NonNull<Chains<B>>) -> Result<NonNull<Chains<B>>, ()>
+	fn allocate_chains_internal(&self, requested_size: usize, mut chains: NonNull<Chains<B>>) -> Result<NonNull<Chains<B>>, ()>
 	{
 		let number_of_blocks_required = self.block_size.number_of_blocks_required(requested_size);
 		if number_of_blocks_required == 0
@@ -271,6 +284,36 @@ impl<B: Block> BlockAllocator<B>
 			}
 			
 			search_for_chain_length -=1;
+		}
+		
+		(BlockPointer::Null, 0)
+	}
+	
+	#[inline(always)]
+	fn grab_a_chain_exactly_for(&self, number_of_blocks: usize) -> (BlockPointer<B>, usize)
+	{
+		if number_of_blocks == 0 || number_of_blocks > InclusiveMaximumChainLength
+		{
+			return (BlockPointer::Null, 0)
+		}
+		
+		// Try to get an exactly right chain or a longer chain.
+		// If the chain is longer, then 'snap off' the right hand side.
+		let mut search_for_chain_length = number_of_blocks;
+		while search_for_chain_length <= InclusiveMaximumChainLength
+		{
+			let our_shorter_chain_length = ChainLength::from_length(search_for_chain_length);
+			let chain = self.bags.remove(&self.block_meta_data_items, our_shorter_chain_length);
+			if chain.is_not_null()
+			{
+				if search_for_chain_length != number_of_blocks
+				{
+					chain.expand_to_pointer_to_meta_data_unchecked(&self.block_meta_data_items).snap_off_back_if_longer_than_required_capacity_and_recycle_into_block_allocator(chain, self.memory_base_pointer, our_shorter_chain_length, self);
+				}
+				return (chain, search_for_chain_length)
+			}
+			
+			search_for_chain_length += 1;
 		}
 		
 		(BlockPointer::Null, 0)
